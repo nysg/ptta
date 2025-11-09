@@ -41,11 +41,14 @@ const commander_1 = require("commander");
 const chalk_1 = __importDefault(require("chalk"));
 const database_1 = require("./database");
 const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+// package.jsonからバージョンを読み込む
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8'));
 const program = new commander_1.Command();
 program
     .name('ptta')
     .description('AI-first Task Management CLI - External memory storage for Claude Code')
-    .version('0.1.0');
+    .version(packageJson.version);
 // データベースインスタンスを作成して処理を実行するヘルパー
 function withDb(fn) {
     return async (...args) => {
