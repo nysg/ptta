@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { PttaDatabase } from './database';
-import type { ProjectUpdate, TaskUpdate, SubtaskUpdate } from './database';
+import type { TaskUpdate, TodoUpdate, ActionUpdate } from './database';
 import { PttaError, getErrorMessage } from './utils/errors';
 import { parseIntSafe } from './utils/validation';
 import * as fs from 'fs';
@@ -51,64 +51,64 @@ function withDb<T extends unknown[]>(
 // グローバルオプション
 program.option('-p, --path <path>', 'Workspace path (default: current directory)');
 
-// プロジェクト作成
+// Task作成
 program
-  .command('project:add')
-  .description('Create a new project')
-  .argument('<title>', 'Project title')
-  .option('-d, --description <desc>', 'Project description')
+  .command('task:add')
+  .description('Create a new task')
+  .argument('<title>', 'Task title')
+  .option('-d, --description <desc>', 'Task description')
   .option('-P, --priority <priority>', 'Priority (low/medium/high)', 'medium')
   .action(withDb(async (db, workspacePath, title, options) => {
-    const project = db.createProject(
+    const task = db.createTask(
       workspacePath,
       title,
       options.description,
       options.priority
     );
-    console.log(chalk.green('✓ Project created:'));
-    console.log(JSON.stringify(project, null, 2));
+    console.log(chalk.green('✓ Task created:'));
+    console.log(JSON.stringify(task, null, 2));
   }));
 
-// プロジェクト一覧
+// Task一覧
 program
-  .command('project:list')
-  .description('List all projects')
+  .command('task:list')
+  .description('List all tasks')
   .option('-s, --status <status>', 'Filter by status')
   .option('-j, --json', 'Output as JSON')
   .action(withDb(async (db, workspacePath, options) => {
-    const projects = db.listProjects(workspacePath, options.status);
+    const tasks = db.listTasks(workspacePath, options.status);
 
     if (options.json) {
-      console.log(JSON.stringify(projects, null, 2));
+      console.log(JSON.stringify(tasks, null, 2));
       return;
     }
 
-    if (projects.length === 0) {
-      console.log(chalk.yellow('No projects found'));
+    if (tasks.length === 0) {
+      console.log(chalk.yellow('No tasks found'));
       return;
     }
 
-    projects.forEach(p => {
-      const statusColor = p.status === 'completed' ? chalk.green : chalk.blue;
-      console.log(`\n${chalk.bold(`#${p.id}`)} ${chalk.cyan(p.title)}`);
-      console.log(`  Status: ${statusColor(p.status)}`);
-      console.log(`  Priority: ${p.priority}`);
-      if (p.description) console.log(`  ${chalk.gray(p.description)}`);
-      console.log(`  Created: ${chalk.gray(p.created_at)}`);
+    tasks.forEach(t => {
+      const statusColor = t.status === 'completed' ? chalk.green : chalk.blue;
+      console.log(`\n${chalk.bold(`#${t.id}`)} ${chalk.cyan(t.title)}`);
+      console.log(`  Status: ${statusColor(t.status)}`);
+      console.log(`  Priority: ${t.priority}`);
+      if (t.description) console.log(`  ${chalk.gray(t.description)}`);
+      console.log(`  Created: ${chalk.gray(t.created_at)}`);
     });
   }));
 
-// プロジェクト詳細
+// Task詳細
 program
-  .command('project:show')
-  .description('Show project with all tasks and subtasks')
-  .argument('<id>', 'Project ID')
+  .command('task:show')
+  .description('Show task with all todos and actions')
+  .argument('<id>', 'Task ID')
   .option('-j, --json', 'Output as JSON')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const hierarchy = db.getProjectHierarchy(workspacePath, parseIntSafe(id, 'project ID'));
+    const hierarchy = db.getTaskHierarchy(workspacePath, parseIntSafe(id, 'task ID'));
 
     if (!hierarchy) {
-      console.log(chalk.red('Project not found'));
+      console.log(chalk.red('Task not found'));
       return;
     }
 
@@ -121,15 +121,15 @@ program
     console.log(chalk.gray(hierarchy.description || ''));
     console.log(`Status: ${hierarchy.status} | Priority: ${hierarchy.priority}\n`);
 
-    if (hierarchy.tasks && hierarchy.tasks.length > 0) {
-      hierarchy.tasks.forEach(task => {
-        const taskStatus = task.status === 'done' ? '✓' : '○';
-        console.log(`  ${taskStatus} [${task.id}] ${task.title} (${task.status})`);
+    if (hierarchy.todos && hierarchy.todos.length > 0) {
+      hierarchy.todos.forEach(todo => {
+        const todoStatus = todo.status === 'done' ? '✓' : '○';
+        console.log(`  ${todoStatus} [${todo.id}] ${todo.title} (${todo.status})`);
 
-        if (task.subtasks && task.subtasks.length > 0) {
-          task.subtasks.forEach(subtask => {
-            const subStatus = subtask.status === 'done' ? '✓' : '○';
-            console.log(`    ${subStatus} [${subtask.id}] ${subtask.title}`);
+        if (todo.actions && todo.actions.length > 0) {
+          todo.actions.forEach(action => {
+            const actionStatus = action.status === 'done' ? '✓' : '○';
+            console.log(`    ${actionStatus} [${action.id}] ${action.title}`);
           });
         }
       });
@@ -143,82 +143,12 @@ program
     }
   }));
 
-// プロジェクト更新
-program
-  .command('project:update')
-  .description('Update project')
-  .argument('<id>', 'Project ID')
-  .option('-s, --status <status>', 'New status (active/completed/archived)')
-  .option('-t, --title <title>', 'New title')
-  .option('-d, --description <desc>', 'New description')
-  .option('-P, --priority <priority>', 'New priority')
-  .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: ProjectUpdate = {};
-    if (options.status) updates.status = options.status;
-    if (options.title) updates.title = options.title;
-    if (options.description) updates.description = options.description;
-    if (options.priority) updates.priority = options.priority;
-
-    const project = db.updateProject(workspacePath, parseIntSafe(id, 'project ID'), updates);
-    console.log(chalk.green('✓ Project updated:'));
-    console.log(JSON.stringify(project, null, 2));
-  }));
-
-// タスク作成
-program
-  .command('task:add')
-  .description('Create a new task')
-  .argument('<projectId>', 'Project ID')
-  .argument('<title>', 'Task title')
-  .option('-d, --description <desc>', 'Task description')
-  .option('-P, --priority <priority>', 'Priority (low/medium/high)', 'medium')
-  .action(withDb(async (db, workspacePath, projectId, title, options) => {
-    const task = db.createTask(
-      workspacePath,
-      parseIntSafe(projectId, 'project ID'),
-      title,
-      options.description,
-      options.priority
-    );
-    console.log(chalk.green('✓ Task created:'));
-    console.log(JSON.stringify(task, null, 2));
-  }));
-
-// タスク一覧
-program
-  .command('task:list')
-  .description('List tasks')
-  .option('-P, --project <id>', 'Filter by project ID')
-  .option('-s, --status <status>', 'Filter by status')
-  .option('-j, --json', 'Output as JSON')
-  .action(withDb(async (db, workspacePath, options) => {
-    const projectId = options.project ? parseIntSafe(options.project, 'project ID') : undefined;
-    const tasks = db.listTasks(workspacePath, projectId, options.status);
-
-    if (options.json) {
-      console.log(JSON.stringify(tasks, null, 2));
-      return;
-    }
-
-    if (tasks.length === 0) {
-      console.log(chalk.yellow('No tasks found'));
-      return;
-    }
-
-    tasks.forEach(t => {
-      const statusIcon = t.status === 'done' ? '✓' : t.status === 'in_progress' ? '◐' : '○';
-      console.log(`${statusIcon} [${t.id}] ${t.title}`);
-      console.log(`  Project: #${t.project_id} | Status: ${t.status} | Priority: ${t.priority}`);
-      if (t.description) console.log(`  ${chalk.gray(t.description)}`);
-    });
-  }));
-
-// タスク更新
+// Task更新
 program
   .command('task:update')
-  .description('Update task status or details')
+  .description('Update task')
   .argument('<id>', 'Task ID')
-  .option('-s, --status <status>', 'New status (todo/in_progress/done)')
+  .option('-s, --status <status>', 'New status (active/completed/archived)')
   .option('-t, --title <title>', 'New title')
   .option('-d, --description <desc>', 'New description')
   .option('-P, --priority <priority>', 'New priority')
@@ -234,51 +164,121 @@ program
     console.log(JSON.stringify(task, null, 2));
   }));
 
-// サブタスク作成
+// Todo作成
 program
-  .command('subtask:add')
-  .description('Create a new subtask')
+  .command('todo:add')
+  .description('Create a new todo')
   .argument('<taskId>', 'Task ID')
-  .argument('<title>', 'Subtask title')
-  .action(withDb(async (db, workspacePath, taskId, title) => {
-    const subtask = db.createSubtask(workspacePath, parseIntSafe(taskId, 'task ID'), title);
-    console.log(chalk.green('✓ Subtask created:'));
-    console.log(JSON.stringify(subtask, null, 2));
+  .argument('<title>', 'Todo title')
+  .option('-d, --description <desc>', 'Todo description')
+  .option('-P, --priority <priority>', 'Priority (low/medium/high)', 'medium')
+  .action(withDb(async (db, workspacePath, taskId, title, options) => {
+    const todo = db.createTodo(
+      workspacePath,
+      parseIntSafe(taskId, 'task ID'),
+      title,
+      options.description,
+      options.priority
+    );
+    console.log(chalk.green('✓ Todo created:'));
+    console.log(JSON.stringify(todo, null, 2));
   }));
 
-// サブタスク完了
+// Todo一覧
 program
-  .command('subtask:done')
-  .description('Mark subtask as done')
-  .argument('<id>', 'Subtask ID')
+  .command('todo:list')
+  .description('List todos')
+  .option('-T, --task <id>', 'Filter by task ID')
+  .option('-s, --status <status>', 'Filter by status')
+  .option('-j, --json', 'Output as JSON')
+  .action(withDb(async (db, workspacePath, options) => {
+    const taskId = options.task ? parseIntSafe(options.task, 'task ID') : undefined;
+    const todos = db.listTodos(workspacePath, taskId, options.status);
+
+    if (options.json) {
+      console.log(JSON.stringify(todos, null, 2));
+      return;
+    }
+
+    if (todos.length === 0) {
+      console.log(chalk.yellow('No todos found'));
+      return;
+    }
+
+    todos.forEach(t => {
+      const statusIcon = t.status === 'done' ? '✓' : t.status === 'in_progress' ? '◐' : '○';
+      console.log(`${statusIcon} [${t.id}] ${t.title}`);
+      console.log(`  Task: #${t.task_id} | Status: ${t.status} | Priority: ${t.priority}`);
+      if (t.description) console.log(`  ${chalk.gray(t.description)}`);
+    });
+  }));
+
+// Todo更新
+program
+  .command('todo:update')
+  .description('Update todo status or details')
+  .argument('<id>', 'Todo ID')
+  .option('-s, --status <status>', 'New status (todo/in_progress/done)')
+  .option('-t, --title <title>', 'New title')
+  .option('-d, --description <desc>', 'New description')
+  .option('-P, --priority <priority>', 'New priority')
+  .action(withDb(async (db, workspacePath, id, options) => {
+    const updates: TodoUpdate = {};
+    if (options.status) updates.status = options.status;
+    if (options.title) updates.title = options.title;
+    if (options.description) updates.description = options.description;
+    if (options.priority) updates.priority = options.priority;
+
+    const todo = db.updateTodo(workspacePath, parseIntSafe(id, 'todo ID'), updates);
+    console.log(chalk.green('✓ Todo updated:'));
+    console.log(JSON.stringify(todo, null, 2));
+  }));
+
+// Action作成
+program
+  .command('action:add')
+  .description('Create a new action')
+  .argument('<todoId>', 'Todo ID')
+  .argument('<title>', 'Action title')
+  .action(withDb(async (db, workspacePath, todoId, title) => {
+    const action = db.createAction(workspacePath, parseIntSafe(todoId, 'todo ID'), title);
+    console.log(chalk.green('✓ Action created:'));
+    console.log(JSON.stringify(action, null, 2));
+  }));
+
+// Action完了
+program
+  .command('action:done')
+  .description('Mark action as done')
+  .argument('<id>', 'Action ID')
   .action(withDb(async (db, workspacePath, id) => {
-    const subtask = db.updateSubtask(workspacePath, parseIntSafe(id, 'subtask ID'), { status: 'done' });
-    console.log(chalk.green('✓ Subtask completed:'));
-    console.log(JSON.stringify(subtask, null, 2));
+    const action = db.updateAction(workspacePath, parseIntSafe(id, 'action ID'), { status: 'done' });
+    console.log(chalk.green('✓ Action completed:'));
+    console.log(JSON.stringify(action, null, 2));
   }));
 
-// サブタスク更新
+// Action更新
 program
-  .command('subtask:update')
-  .description('Update subtask')
-  .argument('<id>', 'Subtask ID')
+  .command('action:update')
+  .description('Update action')
+  .argument('<id>', 'Action ID')
   .option('-s, --status <status>', 'New status (todo/done)')
   .option('-t, --title <title>', 'New title')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: SubtaskUpdate = {};
+    const updates: ActionUpdate = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
 
-    const subtask = db.updateSubtask(workspacePath, parseIntSafe(id, 'subtask ID'), updates);
-    console.log(chalk.green('✓ Subtask updated:'));
-    console.log(JSON.stringify(subtask, null, 2));
+    const action = db.updateAction(workspacePath, parseIntSafe(id, 'action ID'), updates);
+    console.log(chalk.green('✓ Action updated:'));
+    console.log(JSON.stringify(action, null, 2));
   }));
 
 // サマリー追加
 program
   .command('summary:add')
-  .description('Add a summary for a project or task')
-  .argument('<type>', 'Entity type (project/task)')
+  .description('Add a summary for a task, todo or action')
+  .argument('<type>', 'Entity type (task/todo/action)')
   .argument('<id>', 'Entity ID')
   .argument('<summary>', 'Summary text')
   .action(withDb(async (db, workspacePath, type, id, summary) => {
@@ -289,12 +289,12 @@ program
 // エクスポート
 program
   .command('export')
-  .description('Export all data or specific project as JSON')
-  .option('-P, --project <id>', 'Export specific project')
+  .description('Export all data or specific task as JSON')
+  .option('-T, --task <id>', 'Export specific task')
   .option('-o, --output <file>', 'Output file path')
   .action(withDb(async (db, workspacePath, options) => {
-    const projectId = options.project ? parseIntSafe(options.project, 'project ID') : undefined;
-    const data = db.exportAsJson(workspacePath, projectId);
+    const taskId = options.task ? parseIntSafe(options.task, 'task ID') : undefined;
+    const data = db.exportAsJson(workspacePath, taskId);
 
     const jsonData = JSON.stringify(data, null, 2);
 
@@ -321,39 +321,39 @@ program
 
     console.log(chalk.bold('\n📊 Statistics\n'));
 
-    console.log(chalk.cyan('Projects:'));
-    console.log(`  Total: ${stats.projects.total}`);
-    console.log(`  Active: ${chalk.blue(stats.projects.active)}`);
-    console.log(`  Completed: ${chalk.green(stats.projects.completed)}\n`);
-
     console.log(chalk.cyan('Tasks:'));
     console.log(`  Total: ${stats.tasks.total}`);
-    console.log(`  Todo: ${chalk.yellow(stats.tasks.todo)}`);
-    console.log(`  In Progress: ${chalk.blue(stats.tasks.inProgress)}`);
-    console.log(`  Done: ${chalk.green(stats.tasks.done)}\n`);
+    console.log(`  Active: ${chalk.blue(stats.tasks.active)}`);
+    console.log(`  Completed: ${chalk.green(stats.tasks.completed)}\n`);
 
-    console.log(chalk.cyan('Subtasks:'));
-    console.log(`  Total: ${stats.subtasks.total}`);
-    console.log(`  Todo: ${chalk.yellow(stats.subtasks.todo)}`);
-    console.log(`  Done: ${chalk.green(stats.subtasks.done)}`);
+    console.log(chalk.cyan('Todos:'));
+    console.log(`  Total: ${stats.todos.total}`);
+    console.log(`  Todo: ${chalk.yellow(stats.todos.todo)}`);
+    console.log(`  In Progress: ${chalk.blue(stats.todos.inProgress)}`);
+    console.log(`  Done: ${chalk.green(stats.todos.done)}\n`);
+
+    console.log(chalk.cyan('Actions:'));
+    console.log(`  Total: ${stats.actions.total}`);
+    console.log(`  Todo: ${chalk.yellow(stats.actions.todo)}`);
+    console.log(`  Done: ${chalk.green(stats.actions.done)}`);
   }));
 
 // AI用の簡易クエリコマンド
 program
   .command('query')
   .description('Query data in JSON format (AI-friendly)')
-  .argument('<type>', 'Query type (projects/tasks/hierarchy/all/stats/workspaces)')
+  .argument('<type>', 'Query type (tasks/todos/hierarchy/all/stats/workspaces)')
   .option('-i, --id <id>', 'Specific ID')
   .option('-s, --status <status>', 'Filter by status')
   .action(withDb(async (db, workspacePath, type, options) => {
     let result: unknown;
 
     switch (type) {
-      case 'projects':
-        result = db.listProjects(workspacePath, options.status);
-        break;
       case 'tasks':
-        result = db.listTasks(
+        result = db.listTasks(workspacePath, options.status);
+        break;
+      case 'todos':
+        result = db.listTodos(
           workspacePath,
           options.id ? parseIntSafe(options.id, 'ID') : undefined,
           options.status
@@ -364,7 +364,7 @@ program
           console.error('Error: --id required for hierarchy query');
           process.exit(1);
         }
-        result = db.getProjectHierarchy(workspacePath, parseIntSafe(options.id, 'project ID'));
+        result = db.getTaskHierarchy(workspacePath, parseIntSafe(options.id, 'task ID'));
         break;
       case 'all':
         result = db.exportAsJson(workspacePath);

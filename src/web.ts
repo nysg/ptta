@@ -37,23 +37,23 @@ app.get('/api/workspaces', (c) => {
   return c.json(workspaces);
 });
 
-// プロジェクト一覧
-app.get('/api/projects', (c) => {
+// Task一覧
+app.get('/api/tasks', (c) => {
   const workspacePath = c.req.query('path') || process.cwd();
   const status = c.req.query('status');
-  const projects = db.listProjects(workspacePath, status);
-  return c.json(projects);
+  const tasks = db.listTasks(workspacePath, status);
+  return c.json(tasks);
 });
 
-// プロジェクト詳細（階層）
-app.get('/api/projects/:id', (c) => {
+// Task詳細（階層）
+app.get('/api/tasks/:id', (c) => {
   try {
     const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseIntSafe(c.req.param('id'), 'project ID');
-    const hierarchy = db.getProjectHierarchy(workspacePath, id);
+    const id = parseIntSafe(c.req.param('id'), 'task ID');
+    const hierarchy = db.getTaskHierarchy(workspacePath, id);
 
     if (!hierarchy) {
-      return c.json({ error: 'Project not found' }, 404);
+      return c.json({ error: 'Task not found' }, 404);
     }
 
     return c.json(hierarchy);
@@ -65,8 +65,8 @@ app.get('/api/projects/:id', (c) => {
   }
 });
 
-// プロジェクト作成
-app.post('/api/projects', async (c) => {
+// Task作成
+app.post('/api/tasks', async (c) => {
   const workspacePath = c.req.query('path') || process.cwd();
   const body = await c.req.json();
   const { title, description, priority } = body;
@@ -75,64 +75,11 @@ app.post('/api/projects', async (c) => {
     return c.json({ error: 'Title is required' }, 400);
   }
 
-  const project = db.createProject(workspacePath, title, description, priority || 'medium');
-  return c.json(project, 201);
-});
-
-// プロジェクト更新
-app.patch('/api/projects/:id', async (c) => {
-  try {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseIntSafe(c.req.param('id'), 'project ID');
-    const body = await c.req.json();
-
-    const project = db.updateProject(workspacePath, id, body);
-
-    if (!project) {
-      return c.json({ error: 'Project not found' }, 404);
-    }
-
-    return c.json(project);
-  } catch (error) {
-    if (error instanceof PttaError) {
-      return c.json({ error: error.message }, 400);
-    }
-    return c.json({ error: getErrorMessage(error) }, 500);
-  }
-});
-
-// タスク一覧
-app.get('/api/tasks', (c) => {
-  try {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const projectId = c.req.query('projectId') ? parseIntSafe(c.req.query('projectId')!, 'project ID') : undefined;
-    const status = c.req.query('status');
-
-    const tasks = db.listTasks(workspacePath, projectId, status);
-    return c.json(tasks);
-  } catch (error) {
-    if (error instanceof PttaError) {
-      return c.json({ error: error.message }, 400);
-    }
-    return c.json({ error: getErrorMessage(error) }, 500);
-  }
-});
-
-// タスク作成
-app.post('/api/tasks', async (c) => {
-  const workspacePath = c.req.query('path') || process.cwd();
-  const body = await c.req.json();
-  const { project_id, title, description, priority } = body;
-
-  if (!project_id || !title) {
-    return c.json({ error: 'project_id and title are required' }, 400);
-  }
-
-  const task = db.createTask(workspacePath, project_id, title, description, priority || 'medium');
+  const task = db.createTask(workspacePath, title, description, priority || 'medium');
   return c.json(task, 201);
 });
 
-// タスク更新
+// Task更新
 app.patch('/api/tasks/:id', async (c) => {
   try {
     const workspacePath = c.req.query('path') || process.cwd();
@@ -154,34 +101,87 @@ app.patch('/api/tasks/:id', async (c) => {
   }
 });
 
-// サブタスク作成
-app.post('/api/subtasks', async (c) => {
+// Todo一覧
+app.get('/api/todos', (c) => {
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const taskId = c.req.query('taskId') ? parseIntSafe(c.req.query('taskId')!, 'task ID') : undefined;
+    const status = c.req.query('status');
+
+    const todos = db.listTodos(workspacePath, taskId, status);
+    return c.json(todos);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
+  }
+});
+
+// Todo作成
+app.post('/api/todos', async (c) => {
   const workspacePath = c.req.query('path') || process.cwd();
   const body = await c.req.json();
-  const { task_id, title } = body;
+  const { task_id, title, description, priority } = body;
 
   if (!task_id || !title) {
     return c.json({ error: 'task_id and title are required' }, 400);
   }
 
-  const subtask = db.createSubtask(workspacePath, task_id, title);
-  return c.json(subtask, 201);
+  const todo = db.createTodo(workspacePath, task_id, title, description, priority || 'medium');
+  return c.json(todo, 201);
 });
 
-// サブタスク更新
-app.patch('/api/subtasks/:id', async (c) => {
+// Todo更新
+app.patch('/api/todos/:id', async (c) => {
   try {
     const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseIntSafe(c.req.param('id'), 'subtask ID');
+    const id = parseIntSafe(c.req.param('id'), 'todo ID');
     const body = await c.req.json();
 
-    const subtask = db.updateSubtask(workspacePath, id, body);
+    const todo = db.updateTodo(workspacePath, id, body);
 
-    if (!subtask) {
-      return c.json({ error: 'Subtask not found' }, 404);
+    if (!todo) {
+      return c.json({ error: 'Todo not found' }, 404);
     }
 
-    return c.json(subtask);
+    return c.json(todo);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
+  }
+});
+
+// Action作成
+app.post('/api/actions', async (c) => {
+  const workspacePath = c.req.query('path') || process.cwd();
+  const body = await c.req.json();
+  const { todo_id, title } = body;
+
+  if (!todo_id || !title) {
+    return c.json({ error: 'todo_id and title are required' }, 400);
+  }
+
+  const action = db.createAction(workspacePath, todo_id, title);
+  return c.json(action, 201);
+});
+
+// Action更新
+app.patch('/api/actions/:id', async (c) => {
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const id = parseIntSafe(c.req.param('id'), 'action ID');
+    const body = await c.req.json();
+
+    const action = db.updateAction(workspacePath, id, body);
+
+    if (!action) {
+      return c.json({ error: 'Action not found' }, 404);
+    }
+
+    return c.json(action);
   } catch (error) {
     if (error instanceof PttaError) {
       return c.json({ error: error.message }, 400);

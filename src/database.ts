@@ -10,36 +10,36 @@ import { initSchemaVersion, migrate } from './migrations';
 import type {
   Workspace,
   Metadata,
-  Project,
   Task,
-  Subtask,
+  Todo,
+  Action,
   Summary,
-  ProjectHierarchy,
+  TaskHierarchy,
   Stats,
-  ProjectCreateInput,
   TaskCreateInput,
-  SubtaskCreateInput,
-  ProjectUpdate,
+  TodoCreateInput,
+  ActionCreateInput,
   TaskUpdate,
-  SubtaskUpdate
+  TodoUpdate,
+  ActionUpdate
 } from './types';
 
 // Re-export types for backward compatibility
 export type {
   Workspace,
   Metadata,
-  Project,
   Task,
-  Subtask,
+  Todo,
+  Action,
   Summary,
-  ProjectHierarchy,
+  TaskHierarchy,
   Stats,
-  ProjectCreateInput,
   TaskCreateInput,
-  SubtaskCreateInput,
-  ProjectUpdate,
+  TodoCreateInput,
+  ActionCreateInput,
   TaskUpdate,
-  SubtaskUpdate
+  TodoUpdate,
+  ActionUpdate
 };
 
 export class PttaDatabase {
@@ -128,9 +128,9 @@ export class PttaDatabase {
 
   // ワークスペース用のテーブルを作成
   private createWorkspaceTables(suffix: string): void {
-    // プロジェクトテーブル
+    // タスクテーブル
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS projects_${suffix} (
+      CREATE TABLE IF NOT EXISTS tasks_${suffix} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
@@ -143,11 +143,11 @@ export class PttaDatabase {
       )
     `);
 
-    // タスクテーブル
+    // TODOテーブル
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS tasks_${suffix} (
+      CREATE TABLE IF NOT EXISTS todos_${suffix} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id INTEGER,
+        task_id INTEGER,
         title TEXT NOT NULL,
         description TEXT,
         status TEXT DEFAULT 'todo',
@@ -156,22 +156,22 @@ export class PttaDatabase {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
-        FOREIGN KEY (project_id) REFERENCES projects_${suffix}(id) ON DELETE CASCADE
+        FOREIGN KEY (task_id) REFERENCES tasks_${suffix}(id) ON DELETE CASCADE
       )
     `);
 
-    // サブタスクテーブル
+    // アクションテーブル
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS subtasks_${suffix} (
+      CREATE TABLE IF NOT EXISTS actions_${suffix} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id INTEGER NOT NULL,
+        todo_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         status TEXT DEFAULT 'todo',
         metadata TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME,
         completed_at DATETIME,
-        FOREIGN KEY (task_id) REFERENCES tasks_${suffix}(id) ON DELETE CASCADE
+        FOREIGN KEY (todo_id) REFERENCES todos_${suffix}(id) ON DELETE CASCADE
       )
     `);
 
@@ -188,106 +188,29 @@ export class PttaDatabase {
     `);
 
     // インデックス
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_${suffix} ON tasks_${suffix}(project_id)`);
-    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_subtasks_task_${suffix} ON subtasks_${suffix}(task_id)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_todos_task_${suffix} ON todos_${suffix}(task_id)`);
+    this.db.exec(`CREATE INDEX IF NOT EXISTS idx_actions_todo_${suffix} ON actions_${suffix}(todo_id)`);
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_summaries_entity_${suffix} ON summaries_${suffix}(entity_type, entity_id)`);
   }
 
-  // プロジェクト操作
-  createProject(workspacePath: string, title: string, description?: string, priority: string = 'medium', metadata?: Metadata): Project {
+  // Task操作
+  createTask(workspacePath: string, title: string, description?: string, priority: string = 'medium', metadata?: Metadata): Task {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
 
       const info = this.db
-        .prepare(`INSERT INTO projects_${suffix} (title, description, priority, metadata) VALUES (?, ?, ?, ?)`)
+        .prepare(`INSERT INTO tasks_${suffix} (title, description, priority, metadata) VALUES (?, ?, ?, ?)`)
         .run(title, description || null, priority, stringifyMetadata(metadata));
-
-      const project = this.getProject(workspacePath, Number(info.lastInsertRowid));
-      if (!project) {
-        throw new DatabaseError('Failed to retrieve created project');
-      }
-      this.logger.info({ projectId: project.id, title, workspaceId: workspace.id }, 'Created project');
-      return project;
-    } catch (error) {
-      this.logger.error({ title, workspacePath, error }, 'Failed to create project');
-      if (error instanceof DatabaseError) throw error;
-      throw new DatabaseError('Failed to create project', error);
-    }
-  }
-
-  getProject(workspacePath: string, id: number): Project | null {
-    try {
-      const workspace = this.registerWorkspace(workspacePath);
-      const suffix = this.getTableSuffix(workspace.path);
-
-      const project = this.db
-        .prepare(`SELECT * FROM projects_${suffix} WHERE id = ?`)
-        .get(id) as Project | undefined;
-
-      if (!project) return null;
-
-      return parseEntityMetadata(project);
-    } catch (error) {
-      throw new DatabaseError(`Failed to get project with ID ${id}`, error);
-    }
-  }
-
-  listProjects(workspacePath: string, status?: string): Project[] {
-    try {
-      const workspace = this.registerWorkspace(workspacePath);
-      const suffix = this.getTableSuffix(workspace.path);
-
-      let query = `SELECT * FROM projects_${suffix}`;
-      const params: (string | number)[] = [];
-
-      if (status) {
-        query += ' WHERE status = ?';
-        params.push(status);
-      }
-
-      query += ' ORDER BY created_at DESC';
-
-      const projects = this.db.prepare(query).all(...params) as Project[];
-
-      return projects.map(p => parseEntityMetadata(p));
-    } catch (error) {
-      throw new DatabaseError('Failed to list projects', error);
-    }
-  }
-
-  updateProject(workspacePath: string, id: number, updates: ProjectUpdate): Project | null {
-    try {
-      const workspace = this.registerWorkspace(workspacePath);
-      const suffix = this.getTableSuffix(workspace.path);
-
-      const { fields, values } = buildUpdateQuery(updates, ['id', 'created_at'], false);
-      values.push(id);
-
-      this.db.prepare(`UPDATE projects_${suffix} SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-
-      return this.getProject(workspacePath, id);
-    } catch (error) {
-      throw new DatabaseError(`Failed to update project with ID ${id}`, error);
-    }
-  }
-
-  // タスク操作
-  createTask(workspacePath: string, projectId: number, title: string, description?: string, priority: string = 'medium', metadata?: Metadata): Task {
-    try {
-      const workspace = this.registerWorkspace(workspacePath);
-      const suffix = this.getTableSuffix(workspace.path);
-
-      const info = this.db
-        .prepare(`INSERT INTO tasks_${suffix} (project_id, title, description, priority, metadata) VALUES (?, ?, ?, ?, ?)`)
-        .run(projectId, title, description || null, priority, stringifyMetadata(metadata));
 
       const task = this.getTask(workspacePath, Number(info.lastInsertRowid));
       if (!task) {
         throw new DatabaseError('Failed to retrieve created task');
       }
+      this.logger.info({ taskId: task.id, title, workspaceId: workspace.id }, 'Created task');
       return task;
     } catch (error) {
+      this.logger.error({ title, workspacePath, error }, 'Failed to create task');
       if (error instanceof DatabaseError) throw error;
       throw new DatabaseError('Failed to create task', error);
     }
@@ -310,21 +233,16 @@ export class PttaDatabase {
     }
   }
 
-  listTasks(workspacePath: string, projectId?: number, status?: string): Task[] {
+  listTasks(workspacePath: string, status?: string): Task[] {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
 
-      let query = `SELECT * FROM tasks_${suffix} WHERE 1=1`;
+      let query = `SELECT * FROM tasks_${suffix}`;
       const params: (string | number)[] = [];
 
-      if (projectId) {
-        query += ' AND project_id = ?';
-        params.push(projectId);
-      }
-
       if (status) {
-        query += ' AND status = ?';
+        query += ' WHERE status = ?';
         params.push(status);
       }
 
@@ -343,7 +261,7 @@ export class PttaDatabase {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
 
-      const { fields, values } = buildUpdateQuery(updates, ['id', 'created_at', 'project_id'], true);
+      const { fields, values } = buildUpdateQuery(updates, ['id', 'created_at'], false);
       values.push(id);
 
       this.db.prepare(`UPDATE tasks_${suffix} SET ${fields.join(', ')} WHERE id = ?`).run(...values);
@@ -354,60 +272,73 @@ export class PttaDatabase {
     }
   }
 
-  // サブタスク操作
-  createSubtask(workspacePath: string, taskId: number, title: string, metadata?: Metadata): Subtask {
+  // Todo操作
+  createTodo(workspacePath: string, taskId: number, title: string, description?: string, priority: string = 'medium', metadata?: Metadata): Todo {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
 
       const info = this.db
-        .prepare(`INSERT INTO subtasks_${suffix} (task_id, title, metadata) VALUES (?, ?, ?)`)
-        .run(taskId, title, stringifyMetadata(metadata));
+        .prepare(`INSERT INTO todos_${suffix} (task_id, title, description, priority, metadata) VALUES (?, ?, ?, ?, ?)`)
+        .run(taskId, title, description || null, priority, stringifyMetadata(metadata));
 
-      const subtask = this.getSubtask(workspacePath, Number(info.lastInsertRowid));
-      if (!subtask) {
-        throw new DatabaseError('Failed to retrieve created subtask');
+      const todo = this.getTodo(workspacePath, Number(info.lastInsertRowid));
+      if (!todo) {
+        throw new DatabaseError('Failed to retrieve created todo');
       }
-      return subtask;
+      return todo;
     } catch (error) {
       if (error instanceof DatabaseError) throw error;
-      throw new DatabaseError('Failed to create subtask', error);
+      throw new DatabaseError('Failed to create todo', error);
     }
   }
 
-  getSubtask(workspacePath: string, id: number): Subtask | null {
+  getTodo(workspacePath: string, id: number): Todo | null {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
 
-      const subtask = this.db
-        .prepare(`SELECT * FROM subtasks_${suffix} WHERE id = ?`)
-        .get(id) as Subtask | undefined;
+      const todo = this.db
+        .prepare(`SELECT * FROM todos_${suffix} WHERE id = ?`)
+        .get(id) as Todo | undefined;
 
-      if (!subtask) return null;
+      if (!todo) return null;
 
-      return parseEntityMetadata(subtask);
+      return parseEntityMetadata(todo);
     } catch (error) {
-      throw new DatabaseError(`Failed to get subtask with ID ${id}`, error);
+      throw new DatabaseError(`Failed to get todo with ID ${id}`, error);
     }
   }
 
-  listSubtasks(workspacePath: string, taskId: number): Subtask[] {
+  listTodos(workspacePath: string, taskId?: number, status?: string): Todo[] {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
 
-      const subtasks = this.db
-        .prepare(`SELECT * FROM subtasks_${suffix} WHERE task_id = ? ORDER BY created_at`)
-        .all(taskId) as Subtask[];
+      let query = `SELECT * FROM todos_${suffix} WHERE 1=1`;
+      const params: (string | number)[] = [];
 
-      return subtasks.map(s => parseEntityMetadata(s));
+      if (taskId) {
+        query += ' AND task_id = ?';
+        params.push(taskId);
+      }
+
+      if (status) {
+        query += ' AND status = ?';
+        params.push(status);
+      }
+
+      query += ' ORDER BY created_at DESC';
+
+      const todos = this.db.prepare(query).all(...params) as Todo[];
+
+      return todos.map(t => parseEntityMetadata(t));
     } catch (error) {
-      throw new DatabaseError(`Failed to list subtasks for task ${taskId}`, error);
+      throw new DatabaseError('Failed to list todos', error);
     }
   }
 
-  updateSubtask(workspacePath: string, id: number, updates: SubtaskUpdate): Subtask | null {
+  updateTodo(workspacePath: string, id: number, updates: TodoUpdate): Todo | null {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
@@ -415,11 +346,80 @@ export class PttaDatabase {
       const { fields, values } = buildUpdateQuery(updates, ['id', 'created_at', 'task_id'], true);
       values.push(id);
 
-      this.db.prepare(`UPDATE subtasks_${suffix} SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      this.db.prepare(`UPDATE todos_${suffix} SET ${fields.join(', ')} WHERE id = ?`).run(...values);
 
-      return this.getSubtask(workspacePath, id);
+      return this.getTodo(workspacePath, id);
     } catch (error) {
-      throw new DatabaseError(`Failed to update subtask with ID ${id}`, error);
+      throw new DatabaseError(`Failed to update todo with ID ${id}`, error);
+    }
+  }
+
+  // Action操作
+  createAction(workspacePath: string, todoId: number, title: string, metadata?: Metadata): Action {
+    try {
+      const workspace = this.registerWorkspace(workspacePath);
+      const suffix = this.getTableSuffix(workspace.path);
+
+      const info = this.db
+        .prepare(`INSERT INTO actions_${suffix} (todo_id, title, metadata) VALUES (?, ?, ?)`)
+        .run(todoId, title, stringifyMetadata(metadata));
+
+      const action = this.getAction(workspacePath, Number(info.lastInsertRowid));
+      if (!action) {
+        throw new DatabaseError('Failed to retrieve created action');
+      }
+      return action;
+    } catch (error) {
+      if (error instanceof DatabaseError) throw error;
+      throw new DatabaseError('Failed to create action', error);
+    }
+  }
+
+  getAction(workspacePath: string, id: number): Action | null {
+    try {
+      const workspace = this.registerWorkspace(workspacePath);
+      const suffix = this.getTableSuffix(workspace.path);
+
+      const action = this.db
+        .prepare(`SELECT * FROM actions_${suffix} WHERE id = ?`)
+        .get(id) as Action | undefined;
+
+      if (!action) return null;
+
+      return parseEntityMetadata(action);
+    } catch (error) {
+      throw new DatabaseError(`Failed to get action with ID ${id}`, error);
+    }
+  }
+
+  listActions(workspacePath: string, todoId: number): Action[] {
+    try {
+      const workspace = this.registerWorkspace(workspacePath);
+      const suffix = this.getTableSuffix(workspace.path);
+
+      const actions = this.db
+        .prepare(`SELECT * FROM actions_${suffix} WHERE todo_id = ? ORDER BY created_at`)
+        .all(todoId) as Action[];
+
+      return actions.map(a => parseEntityMetadata(a));
+    } catch (error) {
+      throw new DatabaseError(`Failed to list actions for todo ${todoId}`, error);
+    }
+  }
+
+  updateAction(workspacePath: string, id: number, updates: ActionUpdate): Action | null {
+    try {
+      const workspace = this.registerWorkspace(workspacePath);
+      const suffix = this.getTableSuffix(workspace.path);
+
+      const { fields, values } = buildUpdateQuery(updates, ['id', 'created_at', 'todo_id'], true);
+      values.push(id);
+
+      this.db.prepare(`UPDATE actions_${suffix} SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+
+      return this.getAction(workspacePath, id);
+    } catch (error) {
+      throw new DatabaseError(`Failed to update action with ID ${id}`, error);
     }
   }
 
@@ -455,37 +455,37 @@ export class PttaDatabase {
   }
 
   // 階層的な取得
-  getProjectHierarchy(workspacePath: string, projectId: number): ProjectHierarchy | null {
+  getTaskHierarchy(workspacePath: string, taskId: number): TaskHierarchy | null {
     try {
-      const project = this.getProject(workspacePath, projectId);
-      if (!project) return null;
+      const task = this.getTask(workspacePath, taskId);
+      if (!task) return null;
 
-      const tasks = this.listTasks(workspacePath, projectId);
+      const todos = this.listTodos(workspacePath, taskId);
 
-      const hierarchy: ProjectHierarchy = {
-        ...project,
-        tasks: tasks.map(task => ({
-          ...task,
-          subtasks: this.listSubtasks(workspacePath, task.id)
+      const hierarchy: TaskHierarchy = {
+        ...task,
+        todos: todos.map(todo => ({
+          ...todo,
+          actions: this.listActions(workspacePath, todo.id)
         })),
-        summaries: this.getSummaries(workspacePath, 'project', projectId)
+        summaries: this.getSummaries(workspacePath, 'task', taskId)
       };
 
       return hierarchy;
     } catch (error) {
-      throw new DatabaseError(`Failed to get project hierarchy for project ${projectId}`, error);
+      throw new DatabaseError(`Failed to get task hierarchy for task ${taskId}`, error);
     }
   }
 
   // JSON形式でエクスポート
-  exportAsJson(workspacePath: string, projectId?: number): ProjectHierarchy | null | (ProjectHierarchy | null)[] {
+  exportAsJson(workspacePath: string, taskId?: number): TaskHierarchy | null | (TaskHierarchy | null)[] {
     try {
-      if (projectId) {
-        return this.getProjectHierarchy(workspacePath, projectId);
+      if (taskId) {
+        return this.getTaskHierarchy(workspacePath, taskId);
       }
 
-      const projects = this.listProjects(workspacePath);
-      return projects.map(p => this.getProjectHierarchy(workspacePath, p.id));
+      const tasks = this.listTasks(workspacePath);
+      return tasks.map(t => this.getTaskHierarchy(workspacePath, t.id));
     } catch (error) {
       throw new DatabaseError('Failed to export data as JSON', error);
     }
@@ -503,21 +503,21 @@ export class PttaDatabase {
       };
 
       return {
-        projects: {
-          total: getCount(`SELECT COUNT(*) as count FROM projects_${suffix}`),
-          active: getCount(`SELECT COUNT(*) as count FROM projects_${suffix} WHERE status = 'active'`),
-          completed: getCount(`SELECT COUNT(*) as count FROM projects_${suffix} WHERE status = 'completed'`)
-        },
         tasks: {
           total: getCount(`SELECT COUNT(*) as count FROM tasks_${suffix}`),
-          todo: getCount(`SELECT COUNT(*) as count FROM tasks_${suffix} WHERE status = 'todo'`),
-          inProgress: getCount(`SELECT COUNT(*) as count FROM tasks_${suffix} WHERE status = 'in_progress'`),
-          done: getCount(`SELECT COUNT(*) as count FROM tasks_${suffix} WHERE status = 'done'`)
+          active: getCount(`SELECT COUNT(*) as count FROM tasks_${suffix} WHERE status = 'active'`),
+          completed: getCount(`SELECT COUNT(*) as count FROM tasks_${suffix} WHERE status = 'completed'`)
         },
-        subtasks: {
-          total: getCount(`SELECT COUNT(*) as count FROM subtasks_${suffix}`),
-          todo: getCount(`SELECT COUNT(*) as count FROM subtasks_${suffix} WHERE status = 'todo'`),
-          done: getCount(`SELECT COUNT(*) as count FROM subtasks_${suffix} WHERE status = 'done'`)
+        todos: {
+          total: getCount(`SELECT COUNT(*) as count FROM todos_${suffix}`),
+          todo: getCount(`SELECT COUNT(*) as count FROM todos_${suffix} WHERE status = 'todo'`),
+          inProgress: getCount(`SELECT COUNT(*) as count FROM todos_${suffix} WHERE status = 'in_progress'`),
+          done: getCount(`SELECT COUNT(*) as count FROM todos_${suffix} WHERE status = 'done'`)
+        },
+        actions: {
+          total: getCount(`SELECT COUNT(*) as count FROM actions_${suffix}`),
+          todo: getCount(`SELECT COUNT(*) as count FROM actions_${suffix} WHERE status = 'todo'`),
+          done: getCount(`SELECT COUNT(*) as count FROM actions_${suffix} WHERE status = 'done'`)
         }
       };
     } catch (error) {

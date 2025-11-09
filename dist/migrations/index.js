@@ -95,6 +95,106 @@ exports.migrations = [
                 // In production, you'd typically not rollback schema changes
             }
         }
+    },
+    {
+        version: 2,
+        name: 'rename_tables_for_new_hierarchy',
+        up: (db) => {
+            const workspaces = db.listWorkspaces();
+            for (const workspace of workspaces) {
+                const suffix = getTableSuffix(workspace.path);
+                // Step 1: Rename projects → tasks_old (temporary)
+                const projectsExists = db.db
+                    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+                    .get(`projects_${suffix}`);
+                if (projectsExists) {
+                    db.db.exec(`ALTER TABLE projects_${suffix} RENAME TO tasks_old_${suffix}`);
+                }
+                // Step 2: Rename tasks → todos
+                const tasksExists = db.db
+                    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+                    .get(`tasks_${suffix}`);
+                if (tasksExists) {
+                    // First, update todos to reference task_id instead of project_id
+                    // Create new todos table with correct schema
+                    db.db.exec(`
+            CREATE TABLE todos_${suffix} (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              task_id INTEGER,
+              title TEXT NOT NULL,
+              description TEXT,
+              status TEXT DEFAULT 'todo',
+              priority TEXT DEFAULT 'medium',
+              metadata TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              completed_at DATETIME,
+              FOREIGN KEY (task_id) REFERENCES tasks_${suffix}(id) ON DELETE CASCADE
+            )
+          `);
+                    // Copy data from tasks to todos (project_id becomes task_id)
+                    db.db.exec(`
+            INSERT INTO todos_${suffix} (id, task_id, title, description, status, priority, metadata, created_at, updated_at, completed_at)
+            SELECT id, project_id, title, description, status, priority, metadata, created_at, updated_at, completed_at
+            FROM tasks_${suffix}
+          `);
+                    // Drop old tasks table
+                    db.db.exec(`DROP TABLE tasks_${suffix}`);
+                }
+                // Step 3: Rename tasks_old → tasks (projects become tasks)
+                if (projectsExists) {
+                    db.db.exec(`ALTER TABLE tasks_old_${suffix} RENAME TO tasks_${suffix}`);
+                }
+                // Step 4: Rename subtasks → actions with column rename (task_id → todo_id)
+                const subtasksExists = db.db
+                    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+                    .get(`subtasks_${suffix}`);
+                if (subtasksExists) {
+                    // Create new actions table
+                    db.db.exec(`
+            CREATE TABLE actions_${suffix} (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              todo_id INTEGER NOT NULL,
+              title TEXT NOT NULL,
+              status TEXT DEFAULT 'todo',
+              metadata TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME,
+              completed_at DATETIME,
+              FOREIGN KEY (todo_id) REFERENCES todos_${suffix}(id) ON DELETE CASCADE
+            )
+          `);
+                    // Copy data (task_id becomes todo_id)
+                    db.db.exec(`
+            INSERT INTO actions_${suffix} (id, todo_id, title, status, metadata, created_at, updated_at, completed_at)
+            SELECT id, task_id, title, status, metadata, created_at, updated_at, completed_at
+            FROM subtasks_${suffix}
+          `);
+                    // Drop old subtasks table
+                    db.db.exec(`DROP TABLE subtasks_${suffix}`);
+                }
+                // Step 5: Update summaries entity_type
+                const summariesExists = db.db
+                    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+                    .get(`summaries_${suffix}`);
+                if (summariesExists) {
+                    db.db.exec(`
+            UPDATE summaries_${suffix}
+            SET entity_type = CASE
+              WHEN entity_type = 'project' THEN 'task'
+              WHEN entity_type = 'task' THEN 'todo'
+              WHEN entity_type = 'subtask' THEN 'action'
+              ELSE entity_type
+            END
+          `);
+                }
+            }
+        },
+        down: (db) => {
+            // Rollback is complex and risky
+            // For safety, we leave this as no-op
+            // In production, schema changes like this are typically not rolled back
+        }
     }
 ];
 /**
