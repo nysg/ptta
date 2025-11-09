@@ -187,6 +187,43 @@ ptta query workspaces
 - `medium`: Medium (default)
 - `high`: High
 
+## Version History
+
+### v0.2.5 (Latest)
+
+- ✨ **WebUI URL-based Routing**: React Router integration for proper URL navigation
+  - Workspace list: `/`
+  - Task list: `/workspaces/:workspaceId`
+  - Task detail: `/workspaces/:workspaceId/tasks/:taskId`
+- ✅ **Test Suite**: Added comprehensive WebUI routing tests (10 test cases)
+- 🎨 **UI Improvements**: Compact single-line stats display for Tasks/Todos/Actions
+- 🔧 **Configuration**: Added `.gitignore` for Claude Code settings
+
+### v0.2.4
+
+- 🌐 WebUI implementation with Hono + React + TypeScript + Tailwind CSS + shadcn/ui
+- 📊 Task statistics and hierarchy visualization
+- 🎨 Modern UI with status badges and priority indicators
+
+### v0.2.3
+
+- 🧪 Added test suite with vitest (80+ tests)
+- 🛡️ Error handling improvements
+- 📝 JSON validation and utilities
+
+### Earlier Versions
+
+- v0.2.0-0.2.2: Core CLI functionality, database layer, 4-layer hierarchy implementation
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Repository
+
+- GitHub: [https://github.com/nysg/ptta](https://github.com/nysg/ptta)
+- npm: [https://www.npmjs.com/package/@nysg/ptta](https://www.npmjs.com/package/@nysg/ptta)
+
 ## License
 
 MIT
