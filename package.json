@@ -4,7 +4,7 @@
   "description": "AI-first task management CLI - External memory storage for Claude Code",
   "main": "dist/index.js",
   "bin": {
-    "ptta": "./bin/ptta.js"
+    "ptta": "bin/ptta.js"
   },
   "files": [
     "dist",
