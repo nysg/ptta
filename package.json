@@ -1,6 +1,6 @@
 {
   "name": "@nysg/ptta",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "AI-first task management CLI - External memory storage for Claude Code",
   "bin": {
     "ptta": "bin/ptta.js"
