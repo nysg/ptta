@@ -15,9 +15,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 重要な設計方針
 
 - **ストレージ**: SQLite (`~/.ptta/ptta.db`)
-- **プロジェクト管理**: Claude Codeと同様にパスごとにプロジェクトを管理
-- **テーブル構造**: プロジェクトごとにテーブルを持つ
-- **階層構造**: `Project → Task → Todo → Action` の粒度で管理
+- **ワークスペース管理**: Claude Codeと同様にパスごとにワークスペースを管理
+- **テーブル構造**: ワークスペースごとにテーブルを持つ
+- **階層構造**: `Workspace → Task → Todo → Action` の4階層で管理
 - **WebUI**: `ptta web` コマンドでlocalhostを立ち上げ、タスクの確認・管理が可能
 - **インストール**: npmでインストール可能にする
 
@@ -26,12 +26,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### データ階層（実装済み）
 
 ```
-Project (プロジェクト)
-  └── Task (タスク)
-      └── Subtask (サブタスク)
+Workspace (ワークスペース = ディレクトリ)
+  └── Task (タスク = 大きな単位)
+      └── Todo (Todo = 中くらいの単位)
+          └── Action (アクション = 最小単位)
 ```
 
-現在の実装は3階層構造です。各レベルで親子関係を持ち、細かい粒度でタスクを管理できます。
+現在の実装は4階層構造です。Claude Codeのワークスペース概念と整合性を持ち、各レベルで親子関係を持ち、細かい粒度でタスクを管理できます。
 
 ### 技術スタック
 
@@ -43,7 +44,7 @@ Project (プロジェクト)
 ### 設計ポイント
 
 - **パスごとの分離**: ワークスペースパスをMD5ハッシュ化してテーブル名生成
-- **独立したテーブル**: `projects_{hash}`, `tasks_{hash}`, `subtasks_{hash}`, `summaries_{hash}`
+- **独立したテーブル**: `tasks_{hash}`, `todos_{hash}`, `actions_{hash}`, `summaries_{hash}`
 - **JSON出力**: AI統合のためのクエリコマンド (`ptta query`)
 - **コンテキスト節約**: 必要な部分だけ取得可能
 
@@ -83,30 +84,30 @@ npm link
 
 ## 主要なコマンド
 
-### プロジェクト管理
-- `ptta project:add <title>`: プロジェクト作成
-- `ptta project:list`: プロジェクト一覧
-- `ptta project:show <id>`: プロジェクト詳細（階層表示）
-- `ptta project:update <id>`: プロジェクト更新
+### Task管理
+- `ptta task:add <title>`: Task作成
+- `ptta task:list`: Task一覧
+- `ptta task:show <id>`: Task詳細（階層表示）
+- `ptta task:update <id>`: Task更新
 
-### タスク管理
-- `ptta task:add <projectId> <title>`: タスク作成
-- `ptta task:list`: タスク一覧
-- `ptta task:update <id>`: タスク更新
+### Todo管理
+- `ptta todo:add <taskId> <title>`: Todo作成
+- `ptta todo:list`: Todo一覧
+- `ptta todo:update <id>`: Todo更新
 
-### サブタスク管理
-- `ptta subtask:add <taskId> <title>`: サブタスク作成
-- `ptta subtask:done <id>`: サブタスク完了
-- `ptta subtask:update <id>`: サブタスク更新
+### Action管理
+- `ptta action:add <todoId> <title>`: Action作成
+- `ptta action:done <id>`: Action完了
+- `ptta action:update <id>`: Action更新
 
 ### AI統合
 - `ptta query <type>`: JSON形式でデータ取得
-  - types: `projects`, `tasks`, `hierarchy`, `all`, `stats`, `workspaces`
+  - types: `tasks`, `todos`, `hierarchy`, `all`, `stats`, `workspaces`
 - `ptta export`: JSON形式でエクスポート
 - `ptta stats`: 統計情報
 
 ### その他
-- `ptta summary:add <type> <id> <summary>`: サマリー追加
+- `ptta summary:add <type> <id> <summary>`: サマリー追加 (type: task/todo/action)
 - `ptta workspace:list`: ワークスペース一覧
 
 すべてのコマンドで `-p <path>` オプションでワークスペースパスを指定可能（デフォルト: カレントディレクトリ）
@@ -117,19 +118,20 @@ npm link
 - `workspaces`: パス管理、ワークスペース情報
 
 ### ワークスペースごとのテーブル（動的生成）
-- `projects_{hash}`: プロジェクト情報
-- `tasks_{hash}`: タスク情報
-- `subtasks_{hash}`: サブタスク情報
+- `tasks_{hash}`: Task情報
+- `todos_{hash}`: Todo情報
+- `actions_{hash}`: Action情報
 - `summaries_{hash}`: サマリー情報
 
 テーブル名のハッシュはワークスペースパスのMD5から生成（8文字）
 
-## 次のステップ（未実装）
+## 実装済み機能
 
-- WebUI実装（Hono + React + TypeScript + Tailwind CSS + shadcn/ui）
-- `ptta web` コマンド
-- テストの追加
-- npm公開
+- ✅ 4階層データモデル（Workspace → Task → Todo → Action）
+- ✅ WebUI実装（Hono + React + TypeScript + Tailwind CSS + shadcn/ui）
+- ✅ `ptta web` コマンド
+- ✅ テスト（vitest、80テスト）
+- ✅ npm公開（@nysg/ptta）
 
 ## 重要な注意事項
 

@@ -2,14 +2,14 @@
 
 AI-first Task Management CLI - External Memory for Claude Code
 
-**Current Implementation**: Project → Task → Subtask hierarchy
+**Current Implementation**: Workspace → Task → Todo → Action hierarchy (4 layers)
 
 ## Features
 
-- 📋 **Hierarchical Task Management**: Project → Task → Subtask
+- 📋 **Hierarchical Task Management**: Workspace → Task → Todo → Action
 - 🤖 **AI-Optimized**: Structured JSON data, designed for easy Claude Code integration
 - 💾 **Persistent Storage**: Fast data management with better-sqlite3
-- 📁 **Workspace-based**: Independent project management per workspace path
+- 📁 **Workspace-based**: Independent task management per workspace path
 - 🔍 **Efficient Queries**: Save Claude Code's context window
 - 🌐 **Web Interface**: Visual task management via WebUI
 
@@ -43,47 +43,53 @@ Open <http://localhost:3737> in your browser.
 
 ## Basic Usage
 
-### Project Management
-
-```bash
-# Create project
-ptta project:add "Web App Development" -d "New web application project" -P high
-
-# List projects
-ptta project:list
-
-# Show project details (hierarchical view)
-ptta project:show 1
-```
-
 ### Task Management
 
 ```bash
 # Create task
-ptta task:add 1 "Implement authentication" -d "Implement JWT authentication" -P high
+ptta task:add "Web App Development" -d "New web application project" -P high
 
 # List tasks
 ptta task:list
 
-# List tasks for project 1
-ptta task:list -P 1
+# Show task details (hierarchical view with todos and actions)
+ptta task:show 1
 
 # Update task status
-ptta task:update 1 -s in_progress
-
-# Complete task
-ptta task:update 1 -s done
+ptta task:update 1 -s completed
 ```
 
-### Subtask Management
+### Todo Management
 
 ```bash
-# Add subtasks
-ptta subtask:add 1 "Create login UI"
-ptta subtask:add 1 "Implement JWT generation logic"
+# Create todo for task 1
+ptta todo:add 1 "Implement authentication" -d "Implement JWT authentication" -P high
 
-# Complete subtask
-ptta subtask:done 1
+# List all todos
+ptta todo:list
+
+# List todos for task 1
+ptta todo:list -T 1
+
+# Update todo status
+ptta todo:update 1 -s in_progress
+
+# Complete todo
+ptta todo:update 1 -s done
+```
+
+### Action Management
+
+```bash
+# Add actions to todo 1
+ptta action:add 1 "Create login UI"
+ptta action:add 1 "Implement JWT generation logic"
+
+# Complete action
+ptta action:done 1
+
+# Update action
+ptta action:update 1 -s done
 ```
 
 ### Workspace Management
@@ -93,7 +99,7 @@ ptta subtask:done 1
 ptta workspace:list
 
 # Execute in specific workspace
-ptta -p /path/to/project project:list
+ptta -p /path/to/project task:list
 ```
 
 ### Data Export
@@ -102,8 +108,8 @@ ptta -p /path/to/project project:list
 # Export all data as JSON
 ptta export
 
-# Export specific project to file
-ptta export -P 1 -o project1.json
+# Export specific task to file
+ptta export -T 1 -o task1.json
 
 # Show statistics
 ptta stats
@@ -111,38 +117,38 @@ ptta stats
 
 ## Claude Code Integration
 
-### 1. Check current tasks at work start
+### 1. Check current todos at work start
 
 ```bash
-# Get in-progress tasks in JSON format
-ptta query tasks -s in_progress
+# Get in-progress todos in JSON format
+ptta query todos -s in_progress
 ```
 
-### 2. Understand project overview
+### 2. Understand task overview
 
 ```bash
-# Get project hierarchy in JSON format
+# Get task hierarchy (with todos and actions) in JSON format
 ptta query hierarchy -i 1
 ```
 
 ### 3. Record work completion
 
 ```bash
-# Complete task and add summary
-ptta task:update 5 -s done
-ptta summary:add task 5 "API integration completed. Implemented error handling and rate limiting."
+# Complete todo and add summary
+ptta todo:update 5 -s done
+ptta summary:add todo 5 "API integration completed. Implemented error handling and rate limiting."
 ```
 
 ### 4. AI Query Commands (JSON format)
 
 ```bash
-# All projects
-ptta query projects
-
 # All tasks
 ptta query tasks
 
-# Specific project hierarchy
+# All todos
+ptta query todos
+
+# Specific task hierarchy (includes all todos and actions)
 ptta query hierarchy -i 1
 
 # All data
@@ -163,13 +169,13 @@ ptta query workspaces
 
 ## Status Values
 
-### Projects
+### Tasks
 
 - `active`: Active (in progress)
 - `completed`: Completed
 - `archived`: Archived
 
-### Tasks/Subtasks
+### Todos/Actions
 
 - `todo`: Not started
 - `in_progress`: In progress
