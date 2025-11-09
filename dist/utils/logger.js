@@ -14,7 +14,7 @@ const pino_1 = __importDefault(require("pino"));
  */
 const isDevelopment = process.env.NODE_ENV !== 'production';
 exports.logger = (0, pino_1.default)({
-    level: process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info'),
+    level: process.env.LOG_LEVEL || 'info',
     transport: isDevelopment
         ? {
             target: 'pino-pretty',
