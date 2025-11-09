@@ -16,5 +16,5 @@
     "moduleResolution": "node"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "aitodo"]
+  "exclude": ["node_modules", "dist", "aitodo", "src/**/*.test.ts", "src/**/__tests__/**"]
 }

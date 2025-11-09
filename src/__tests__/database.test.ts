@@ -68,54 +68,55 @@ describe('PttaDatabase', () => {
     });
   });
 
-  describe('Project CRUD', () => {
+  describe('Task CRUD', () => {
     beforeEach(() => {
       db.registerWorkspace(testWorkspacePath);
     });
 
-    it('プロジェクトを作成できる', () => {
-      const project = db.createProject(
+    it('タスクを作成できる', () => {
+      const task = db.createTask(
         testWorkspacePath,
-        'Test Project',
+        'Test Task',
         'Test Description',
         'high'
       );
 
-      expect(project.id).toBeDefined();
-      expect(project.title).toBe('Test Project');
-      expect(project.description).toBe('Test Description');
-      expect(project.priority).toBe('high');
-      expect(project.status).toBe('active');
+      expect(task.id).toBeDefined();
+      expect(task.title).toBe('Test Task');
+      expect(task.description).toBe('Test Description');
+      expect(task.priority).toBe('high');
+      expect(task.status).toBe('active');
     });
 
-    it('プロジェクト一覧を取得できる', () => {
-      db.createProject(testWorkspacePath, 'Project 1');
-      db.createProject(testWorkspacePath, 'Project 2');
+    it('タスク一覧を取得できる', () => {
+      db.createTask(testWorkspacePath, 'Task 1');
+      db.createTask(testWorkspacePath, 'Task 2');
 
-      const projects = db.listProjects(testWorkspacePath);
+      const tasks = db.listTasks(testWorkspacePath);
 
-      expect(projects.length).toBe(2);
-      expect(projects[0].title).toBe('Project 1');
-      expect(projects[1].title).toBe('Project 2');
+      expect(tasks.length).toBe(2);
+      // ORDER BY created_at DESC なので、後に作成された方が先
+      expect(tasks.some(t => t.title === 'Task 1')).toBe(true);
+      expect(tasks.some(t => t.title === 'Task 2')).toBe(true);
     });
 
-    it('プロジェクトをステータスでフィルタリングできる', () => {
-      const project1 = db.createProject(testWorkspacePath, 'Active Project');
-      db.createProject(testWorkspacePath, 'Another Active');
+    it('タスクをステータスでフィルタリングできる', () => {
+      const task1 = db.createTask(testWorkspacePath, 'Active Task');
+      db.createTask(testWorkspacePath, 'Another Active');
 
-      db.updateProject(testWorkspacePath, project1.id, { status: 'completed' });
+      db.updateTask(testWorkspacePath, task1.id, { status: 'completed' });
 
-      const activeProjects = db.listProjects(testWorkspacePath, 'active');
-      const completedProjects = db.listProjects(testWorkspacePath, 'completed');
+      const activeTasks = db.listTasks(testWorkspacePath, 'active');
+      const completedTasks = db.listTasks(testWorkspacePath, 'completed');
 
-      expect(activeProjects.length).toBe(1);
-      expect(completedProjects.length).toBe(1);
+      expect(activeTasks.length).toBe(1);
+      expect(completedTasks.length).toBe(1);
     });
 
-    it('プロジェクトを更新できる', () => {
-      const project = db.createProject(testWorkspacePath, 'Original Title');
+    it('タスクを更新できる', () => {
+      const task = db.createTask(testWorkspacePath, 'Original Title');
 
-      const updated = db.updateProject(testWorkspacePath, project.id, {
+      const updated = db.updateTask(testWorkspacePath, task.id, {
         title: 'Updated Title',
         description: 'New Description',
         priority: 'low',
@@ -126,8 +127,8 @@ describe('PttaDatabase', () => {
       expect(updated?.priority).toBe('low');
     });
 
-    it('存在しないプロジェクトの更新でnullを返す', () => {
-      const result = db.updateProject(testWorkspacePath, 99999, {
+    it('存在しないタスクの更新でnullを返す', () => {
+      const result = db.updateTask(testWorkspacePath, 99999, {
         title: 'Should not update',
       });
 
@@ -135,131 +136,131 @@ describe('PttaDatabase', () => {
     });
   });
 
-  describe('Task CRUD', () => {
-    let projectId: number;
-
-    beforeEach(() => {
-      db.registerWorkspace(testWorkspacePath);
-      const project = db.createProject(testWorkspacePath, 'Test Project');
-      projectId = project.id;
-    });
-
-    it('タスクを作成できる', () => {
-      const task = db.createTask(
-        testWorkspacePath,
-        projectId,
-        'Test Task',
-        'Task Description',
-        'medium'
-      );
-
-      expect(task.id).toBeDefined();
-      expect(task.project_id).toBe(projectId);
-      expect(task.title).toBe('Test Task');
-      expect(task.description).toBe('Task Description');
-      expect(task.priority).toBe('medium');
-      expect(task.status).toBe('todo');
-    });
-
-    it('タスク一覧を取得できる', () => {
-      db.createTask(testWorkspacePath, projectId, 'Task 1');
-      db.createTask(testWorkspacePath, projectId, 'Task 2');
-
-      const tasks = db.listTasks(testWorkspacePath, projectId);
-
-      expect(tasks.length).toBe(2);
-    });
-
-    it('タスクをステータスでフィルタリングできる', () => {
-      const task1 = db.createTask(testWorkspacePath, projectId, 'Task 1');
-      db.createTask(testWorkspacePath, projectId, 'Task 2');
-
-      db.updateTask(testWorkspacePath, task1.id, { status: 'done' });
-
-      const todoTasks = db.listTasks(testWorkspacePath, projectId, 'todo');
-      const doneTasks = db.listTasks(testWorkspacePath, projectId, 'done');
-
-      expect(todoTasks.length).toBe(1);
-      expect(doneTasks.length).toBe(1);
-    });
-
-    it('タスクを更新できる', () => {
-      const task = db.createTask(testWorkspacePath, projectId, 'Original Task');
-
-      const updated = db.updateTask(testWorkspacePath, task.id, {
-        title: 'Updated Task',
-        status: 'in_progress',
-      });
-
-      expect(updated?.title).toBe('Updated Task');
-      expect(updated?.status).toBe('in_progress');
-    });
-  });
-
-  describe('Subtask CRUD', () => {
-    let projectId: number;
+  describe('Todo CRUD', () => {
     let taskId: number;
 
     beforeEach(() => {
       db.registerWorkspace(testWorkspacePath);
-      const project = db.createProject(testWorkspacePath, 'Test Project');
-      projectId = project.id;
-      const task = db.createTask(testWorkspacePath, projectId, 'Test Task');
+      const task = db.createTask(testWorkspacePath, 'Test Task');
       taskId = task.id;
     });
 
-    it('サブタスクを作成できる', () => {
-      const subtask = db.createSubtask(testWorkspacePath, taskId, 'Test Subtask');
+    it('Todoを作成できる', () => {
+      const todo = db.createTodo(
+        testWorkspacePath,
+        taskId,
+        'Test Todo',
+        'Todo Description',
+        'medium'
+      );
 
-      expect(subtask.id).toBeDefined();
-      expect(subtask.task_id).toBe(taskId);
-      expect(subtask.title).toBe('Test Subtask');
-      expect(subtask.status).toBe('todo');
+      expect(todo.id).toBeDefined();
+      expect(todo.task_id).toBe(taskId);
+      expect(todo.title).toBe('Test Todo');
+      expect(todo.description).toBe('Todo Description');
+      expect(todo.priority).toBe('medium');
+      expect(todo.status).toBe('todo');
     });
 
-    it('サブタスクを完了にできる', () => {
-      const subtask = db.createSubtask(testWorkspacePath, taskId, 'Subtask to complete');
+    it('Todo一覧を取得できる', () => {
+      db.createTodo(testWorkspacePath, taskId, 'Todo 1');
+      db.createTodo(testWorkspacePath, taskId, 'Todo 2');
 
-      const completed = db.updateSubtask(testWorkspacePath, subtask.id, { status: 'done' });
+      const todos = db.listTodos(testWorkspacePath, taskId);
+
+      expect(todos.length).toBe(2);
+    });
+
+    it('Todoをステータスでフィルタリングできる', () => {
+      const todo1 = db.createTodo(testWorkspacePath, taskId, 'Todo 1');
+      db.createTodo(testWorkspacePath, taskId, 'Todo 2');
+
+      db.updateTodo(testWorkspacePath, todo1.id, { status: 'done' });
+
+      const todoTodos = db.listTodos(testWorkspacePath, taskId, 'todo');
+      const doneTodos = db.listTodos(testWorkspacePath, taskId, 'done');
+
+      expect(todoTodos.length).toBe(1);
+      expect(doneTodos.length).toBe(1);
+    });
+
+    it('Todoを更新できる', () => {
+      const todo = db.createTodo(testWorkspacePath, taskId, 'Original Todo');
+
+      const updated = db.updateTodo(testWorkspacePath, todo.id, {
+        title: 'Updated Todo',
+        status: 'in_progress',
+      });
+
+      expect(updated?.title).toBe('Updated Todo');
+      expect(updated?.status).toBe('in_progress');
+    });
+  });
+
+  describe('Action CRUD', () => {
+    let taskId: number;
+    let todoId: number;
+
+    beforeEach(() => {
+      db.registerWorkspace(testWorkspacePath);
+      const task = db.createTask(testWorkspacePath, 'Test Task');
+      taskId = task.id;
+      const todo = db.createTodo(testWorkspacePath, taskId, 'Test Todo');
+      todoId = todo.id;
+    });
+
+    it('Actionを作成できる', () => {
+      const action = db.createAction(testWorkspacePath, todoId, 'Test Action');
+
+      expect(action.id).toBeDefined();
+      expect(action.todo_id).toBe(todoId);
+      expect(action.title).toBe('Test Action');
+      expect(action.status).toBe('todo');
+    });
+
+    it('Actionを完了にできる', () => {
+      const action = db.createAction(testWorkspacePath, todoId, 'Action to complete');
+
+      const completed = db.updateAction(testWorkspacePath, action.id, { status: 'done' });
 
       expect(completed?.status).toBe('done');
       expect(completed?.completed_at).toBeDefined();
     });
 
-    it('サブタスクを更新できる', () => {
-      const subtask = db.createSubtask(testWorkspacePath, taskId, 'Original Subtask');
+    it('Actionを更新できる', () => {
+      const action = db.createAction(testWorkspacePath, todoId, 'Original Action');
 
-      const updated = db.updateSubtask(testWorkspacePath, subtask.id, {
-        title: 'Updated Subtask',
+      const updated = db.updateAction(testWorkspacePath, action.id, {
+        title: 'Updated Action',
         status: 'done',
       });
 
-      expect(updated?.title).toBe('Updated Subtask');
+      expect(updated?.title).toBe('Updated Action');
       expect(updated?.status).toBe('done');
     });
   });
 
-  describe('Project Hierarchy', () => {
-    it('プロジェクト階層を取得できる', () => {
+  describe('Task Hierarchy', () => {
+    it('タスク階層を取得できる', () => {
       db.registerWorkspace(testWorkspacePath);
-      const project = db.createProject(testWorkspacePath, 'Project with Tasks');
-      const task1 = db.createTask(testWorkspacePath, project.id, 'Task 1');
-      const task2 = db.createTask(testWorkspacePath, project.id, 'Task 2');
+      const task = db.createTask(testWorkspacePath, 'Task with Todos');
+      const todo1 = db.createTodo(testWorkspacePath, task.id, 'Todo 1');
+      const todo2 = db.createTodo(testWorkspacePath, task.id, 'Todo 2');
 
-      db.createSubtask(testWorkspacePath, task1.id, 'Subtask 1-1');
-      db.createSubtask(testWorkspacePath, task1.id, 'Subtask 1-2');
+      db.createAction(testWorkspacePath, todo1.id, 'Action 1-1');
+      db.createAction(testWorkspacePath, todo1.id, 'Action 1-2');
 
-      const hierarchy = db.getProjectHierarchy(testWorkspacePath, project.id);
+      const hierarchy = db.getTaskHierarchy(testWorkspacePath, task.id);
 
       expect(hierarchy).toBeDefined();
-      expect(hierarchy?.title).toBe('Project with Tasks');
-      expect(hierarchy?.tasks).toHaveLength(2);
-      expect(hierarchy?.tasks?.[0].subtasks).toHaveLength(2);
+      expect(hierarchy?.title).toBe('Task with Todos');
+      expect(hierarchy?.todos).toHaveLength(2);
+      expect(hierarchy?.todos?.[0].actions).toHaveLength(2);
     });
 
-    it('存在しないプロジェクトでnullを返す', () => {
+    it('存在しないタスクでnullを返す', () => {
       db.registerWorkspace(testWorkspacePath);
-      const hierarchy = db.getProjectHierarchy(testWorkspacePath, 99999);
+      const hierarchy = db.getTaskHierarchy(testWorkspacePath, 99999);
 
       expect(hierarchy).toBeNull();
     });
@@ -268,27 +269,27 @@ describe('PttaDatabase', () => {
   describe('Stats', () => {
     it('統計情報を取得できる', () => {
       db.registerWorkspace(testWorkspacePath);
-      const project1 = db.createProject(testWorkspacePath, 'Project 1');
-      const project2 = db.createProject(testWorkspacePath, 'Project 2');
+      const task1 = db.createTask(testWorkspacePath, 'Task 1');
+      const task2 = db.createTask(testWorkspacePath, 'Task 2');
 
-      const task1 = db.createTask(testWorkspacePath, project1.id, 'Task 1');
-      const task2 = db.createTask(testWorkspacePath, project1.id, 'Task 2');
+      const todo1 = db.createTodo(testWorkspacePath, task1.id, 'Todo 1');
+      const todo2 = db.createTodo(testWorkspacePath, task1.id, 'Todo 2');
 
-      db.createSubtask(testWorkspacePath, task1.id, 'Subtask 1');
-      db.createSubtask(testWorkspacePath, task1.id, 'Subtask 2');
+      db.createAction(testWorkspacePath, todo1.id, 'Action 1');
+      db.createAction(testWorkspacePath, todo1.id, 'Action 2');
 
-      db.updateProject(testWorkspacePath, project2.id, { status: 'completed' });
-      db.updateTask(testWorkspacePath, task2.id, { status: 'done' });
+      db.updateTask(testWorkspacePath, task2.id, { status: 'completed' });
+      db.updateTodo(testWorkspacePath, todo2.id, { status: 'done' });
 
       const stats = db.getStats(testWorkspacePath);
 
-      expect(stats.projects.total).toBe(2);
-      expect(stats.projects.active).toBe(1);
-      expect(stats.projects.completed).toBe(1);
       expect(stats.tasks.total).toBe(2);
-      expect(stats.tasks.todo).toBe(1);
-      expect(stats.tasks.done).toBe(1);
-      expect(stats.subtasks.total).toBe(2);
+      expect(stats.tasks.active).toBe(1);
+      expect(stats.tasks.completed).toBe(1);
+      expect(stats.todos.total).toBe(2);
+      expect(stats.todos.todo).toBe(1);
+      expect(stats.todos.done).toBe(1);
+      expect(stats.actions.total).toBe(2);
     });
   });
 
@@ -297,16 +298,16 @@ describe('PttaDatabase', () => {
       db.registerWorkspace(testWorkspacePath);
 
       const result = db.transaction(() => {
-        const project = db.createProject(testWorkspacePath, 'Transactional Project');
-        const task = db.createTask(testWorkspacePath, project.id, 'Transactional Task');
-        return { project, task };
+        const task = db.createTask(testWorkspacePath, 'Transactional Task');
+        const todo = db.createTodo(testWorkspacePath, task.id, 'Transactional Todo');
+        return { task, todo };
       });
 
-      expect(result.project.id).toBeDefined();
       expect(result.task.id).toBeDefined();
+      expect(result.todo.id).toBeDefined();
 
-      const projects = db.listProjects(testWorkspacePath);
-      expect(projects.length).toBe(1);
+      const tasks = db.listTasks(testWorkspacePath);
+      expect(tasks.length).toBe(1);
     });
 
     it('トランザクション内でエラーが発生したらロールバックされる', () => {
@@ -314,47 +315,47 @@ describe('PttaDatabase', () => {
 
       expect(() => {
         db.transaction(() => {
-          db.createProject(testWorkspacePath, 'Project 1');
-          db.createProject(testWorkspacePath, 'Project 2');
+          db.createTask(testWorkspacePath, 'Task 1');
+          db.createTask(testWorkspacePath, 'Task 2');
           throw new Error('Test error');
         });
       }).toThrow('Test error');
 
-      // ロールバックされるのでプロジェクトは作成されない
-      const projects = db.listProjects(testWorkspacePath);
-      expect(projects.length).toBe(0);
+      // ロールバックされるのでタスクは作成されない
+      const tasks = db.listTasks(testWorkspacePath);
+      expect(tasks.length).toBe(0);
     });
   });
 
   describe('Summary', () => {
-    it('プロジェクトのサマリーを作成できる', () => {
-      db.registerWorkspace(testWorkspacePath);
-      const project = db.createProject(testWorkspacePath, 'Test Project');
-
-      const summaryId = db.createSummary(
-        testWorkspacePath,
-        'project',
-        project.id,
-        'This is a summary of the project'
-      );
-
-      expect(summaryId).toBeDefined();
-
-      const hierarchy = db.getProjectHierarchy(testWorkspacePath, project.id);
-      expect(hierarchy?.summaries).toHaveLength(1);
-      expect(hierarchy?.summaries?.[0].summary).toBe('This is a summary of the project');
-    });
-
     it('タスクのサマリーを作成できる', () => {
       db.registerWorkspace(testWorkspacePath);
-      const project = db.createProject(testWorkspacePath, 'Test Project');
-      const task = db.createTask(testWorkspacePath, project.id, 'Test Task');
+      const task = db.createTask(testWorkspacePath, 'Test Task');
 
       const summaryId = db.createSummary(
         testWorkspacePath,
         'task',
         task.id,
         'This is a summary of the task'
+      );
+
+      expect(summaryId).toBeDefined();
+
+      const hierarchy = db.getTaskHierarchy(testWorkspacePath, task.id);
+      expect(hierarchy?.summaries).toHaveLength(1);
+      expect(hierarchy?.summaries?.[0].summary).toBe('This is a summary of the task');
+    });
+
+    it('Todoのサマリーを作成できる', () => {
+      db.registerWorkspace(testWorkspacePath);
+      const task = db.createTask(testWorkspacePath, 'Test Task');
+      const todo = db.createTodo(testWorkspacePath, task.id, 'Test Todo');
+
+      const summaryId = db.createSummary(
+        testWorkspacePath,
+        'todo',
+        todo.id,
+        'This is a summary of the todo'
       );
 
       expect(summaryId).toBeDefined();
