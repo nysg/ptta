@@ -80,7 +80,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist - コメントアウト: npmパッケージとして配布するため、distをコミット
 
 # Gatsby files
 .cache/
