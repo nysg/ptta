@@ -11,21 +11,8 @@ export interface Summary {
   created_at: string;
 }
 
-export interface Project {
-  id: number;
-  title: string;
-  description?: string;
-  status: string;
-  priority: string;
-  metadata?: Metadata;
-  created_at: string;
-  updated_at: string;
-  completed_at?: string;
-}
-
 export interface Task {
   id: number;
-  project_id: number;
   title: string;
   description?: string;
   status: string;
@@ -36,34 +23,47 @@ export interface Task {
   completed_at?: string;
 }
 
-export interface Subtask {
+export interface Todo {
   id: number;
   task_id: number;
   title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  metadata?: Metadata;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+export interface Action {
+  id: number;
+  todo_id: number;
+  title: string;
   status: string;
   metadata?: Metadata;
   created_at: string;
   completed_at?: string;
 }
 
-export interface ProjectHierarchy extends Project {
-  tasks?: (Task & { subtasks?: Subtask[] })[];
+export interface TaskHierarchy extends Task {
+  todos?: (Todo & { actions?: Action[] })[];
   summaries?: Summary[];
 }
 
 export interface Stats {
-  projects: {
+  tasks: {
     total: number;
     active: number;
     completed: number;
   };
-  tasks: {
+  todos: {
     total: number;
     todo: number;
     inProgress: number;
     done: number;
   };
-  subtasks: {
+  actions: {
     total: number;
     todo: number;
     done: number;
@@ -71,14 +71,6 @@ export interface Stats {
 }
 
 // Update types for partial updates
-export interface ProjectUpdate {
-  title?: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  metadata?: Metadata;
-}
-
 export interface TaskUpdate {
   title?: string;
   description?: string;
@@ -87,7 +79,15 @@ export interface TaskUpdate {
   metadata?: Metadata;
 }
 
-export interface SubtaskUpdate {
+export interface TodoUpdate {
+  title?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  metadata?: Metadata;
+}
+
+export interface ActionUpdate {
   title?: string;
   status?: string;
   metadata?: Metadata;
@@ -95,69 +95,10 @@ export interface SubtaskUpdate {
 
 // API Client
 export const api = {
-  // Projects
-  async getProjects(path?: string, status?: string): Promise<Project[]> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-    if (status) params.append('status', status);
-
-    const response = await fetch(`${API_BASE_URL}/projects?${params}`);
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch projects' }));
-      throw new Error(error.error || 'Failed to fetch projects');
-    }
-    return response.json();
-  },
-
-  async getProject(id: number, path?: string): Promise<ProjectHierarchy> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/projects/${id}?${params}`);
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch project' }));
-      throw new Error(error.error || 'Failed to fetch project');
-    }
-    return response.json();
-  },
-
-  async createProject(data: { title: string; description?: string; priority?: string }, path?: string): Promise<Project> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/projects?${params}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to create project' }));
-      throw new Error(error.error || 'Failed to create project');
-    }
-    return response.json();
-  },
-
-  async updateProject(id: number, data: ProjectUpdate, path?: string): Promise<Project> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/projects/${id}?${params}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update project' }));
-      throw new Error(error.error || 'Failed to update project');
-    }
-    return response.json();
-  },
-
   // Tasks
-  async getTasks(path?: string, projectId?: number, status?: string): Promise<Task[]> {
+  async getTasks(path?: string, status?: string): Promise<Task[]> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
-    if (projectId) params.append('projectId', projectId.toString());
     if (status) params.append('status', status);
 
     const response = await fetch(`${API_BASE_URL}/tasks?${params}`);
@@ -168,7 +109,19 @@ export const api = {
     return response.json();
   },
 
-  async createTask(data: { project_id: number; title: string; description?: string; priority?: string }, path?: string): Promise<Task> {
+  async getTask(id: number, path?: string): Promise<TaskHierarchy> {
+    const params = new URLSearchParams();
+    if (path) params.append('path', path);
+
+    const response = await fetch(`${API_BASE_URL}/tasks/${id}?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch task' }));
+      throw new Error(error.error || 'Failed to fetch task');
+    }
+    return response.json();
+  },
+
+  async createTask(data: { title: string; description?: string; priority?: string }, path?: string): Promise<Task> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 
@@ -200,35 +153,82 @@ export const api = {
     return response.json();
   },
 
-  // Subtasks
-  async createSubtask(data: { task_id: number; title: string }, path?: string): Promise<Subtask> {
+  // Todos
+  async getTodos(path?: string, taskId?: number, status?: string): Promise<Todo[]> {
+    const params = new URLSearchParams();
+    if (path) params.append('path', path);
+    if (taskId) params.append('taskId', taskId.toString());
+    if (status) params.append('status', status);
+
+    const response = await fetch(`${API_BASE_URL}/todos?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch todos' }));
+      throw new Error(error.error || 'Failed to fetch todos');
+    }
+    return response.json();
+  },
+
+  async createTodo(data: { task_id: number; title: string; description?: string; priority?: string }, path?: string): Promise<Todo> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 
-    const response = await fetch(`${API_BASE_URL}/subtasks?${params}`, {
+    const response = await fetch(`${API_BASE_URL}/todos?${params}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to create subtask' }));
-      throw new Error(error.error || 'Failed to create subtask');
+      const error = await response.json().catch(() => ({ error: 'Failed to create todo' }));
+      throw new Error(error.error || 'Failed to create todo');
     }
     return response.json();
   },
 
-  async updateSubtask(id: number, data: SubtaskUpdate, path?: string): Promise<Subtask> {
+  async updateTodo(id: number, data: TodoUpdate, path?: string): Promise<Todo> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 
-    const response = await fetch(`${API_BASE_URL}/subtasks/${id}?${params}`, {
+    const response = await fetch(`${API_BASE_URL}/todos/${id}?${params}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update subtask' }));
-      throw new Error(error.error || 'Failed to update subtask');
+      const error = await response.json().catch(() => ({ error: 'Failed to update todo' }));
+      throw new Error(error.error || 'Failed to update todo');
+    }
+    return response.json();
+  },
+
+  // Actions
+  async createAction(data: { todo_id: number; title: string }, path?: string): Promise<Action> {
+    const params = new URLSearchParams();
+    if (path) params.append('path', path);
+
+    const response = await fetch(`${API_BASE_URL}/actions?${params}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create action' }));
+      throw new Error(error.error || 'Failed to create action');
+    }
+    return response.json();
+  },
+
+  async updateAction(id: number, data: ActionUpdate, path?: string): Promise<Action> {
+    const params = new URLSearchParams();
+    if (path) params.append('path', path);
+
+    const response = await fetch(`${API_BASE_URL}/actions/${id}?${params}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update action' }));
+      throw new Error(error.error || 'Failed to update action');
     }
     return response.json();
   },

@@ -1,21 +1,21 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, type Project, type ProjectHierarchy } from './lib/api'
+import { api, type Task, type TaskHierarchy } from './lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 
 function App() {
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
 
-  const { data: projects, isLoading } = useQuery<Project[]>({
-    queryKey: ['projects'],
-    queryFn: () => api.getProjects(),
+  const { data: tasks, isLoading } = useQuery<Task[]>({
+    queryKey: ['tasks'],
+    queryFn: () => api.getTasks(),
   })
 
-  const { data: projectDetail } = useQuery<ProjectHierarchy>({
-    queryKey: ['project', selectedProjectId],
-    queryFn: () => api.getProject(selectedProjectId!),
-    enabled: selectedProjectId !== null,
+  const { data: taskDetail } = useQuery<TaskHierarchy>({
+    queryKey: ['task', selectedTaskId],
+    queryFn: () => api.getTask(selectedTaskId!),
+    enabled: selectedTaskId !== null,
   })
 
   const { data: stats } = useQuery({
@@ -39,9 +39,9 @@ function App() {
             <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
             <p className="text-muted-foreground">AI-first Task Management</p>
           </div>
-          {selectedProjectId && (
-            <Button variant="outline" onClick={() => setSelectedProjectId(null)}>
-              Back to Projects
+          {selectedTaskId && (
+            <Button variant="outline" onClick={() => setSelectedTaskId(null)}>
+              Back to Tasks
             </Button>
           )}
         </div>
@@ -50,69 +50,69 @@ function App() {
           <div className="grid gap-4 md:grid-cols-3 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Projects</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.projects.total}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.projects.active} active, {stats.projects.completed} completed
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Tasks</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.tasks.total}</div>
                 <p className="text-xs text-muted-foreground">
-                  {stats.tasks.inProgress} in progress, {stats.tasks.done} done
+                  {stats.tasks.active} active, {stats.tasks.completed} completed
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Subtasks</CardTitle>
+                <CardTitle className="text-sm font-medium">Todos</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.subtasks.total}</div>
+                <div className="text-2xl font-bold">{stats.todos.total}</div>
                 <p className="text-xs text-muted-foreground">
-                  {stats.subtasks.todo} todo, {stats.subtasks.done} done
+                  {stats.todos.inProgress} in progress, {stats.todos.done} done
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.actions.total}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.actions.todo} todo, {stats.actions.done} done
                 </p>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {selectedProjectId && projectDetail ? (
+        {selectedTaskId && taskDetail ? (
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-3xl">#{projectDetail.id} {projectDetail.title}</CardTitle>
-                    {projectDetail.description && (
+                    <CardTitle className="text-3xl">#{taskDetail.id} {taskDetail.title}</CardTitle>
+                    {taskDetail.description && (
                       <CardDescription className="mt-2 text-base">
-                        {projectDetail.description}
+                        {taskDetail.description}
                       </CardDescription>
                     )}
                   </div>
                   <div className="flex gap-2">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      projectDetail.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                      projectDetail.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      taskDetail.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                      taskDetail.status === 'completed' ? 'bg-green-100 text-green-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>
-                      {projectDetail.status}
+                      {taskDetail.status}
                     </span>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      projectDetail.priority === 'high' ? 'bg-red-100 text-red-700' :
-                      projectDetail.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                      taskDetail.priority === 'high' ? 'bg-red-100 text-red-700' :
+                      taskDetail.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>
-                      {projectDetail.priority}
+                      {taskDetail.priority}
                     </span>
                   </div>
                 </div>
@@ -120,55 +120,55 @@ function App() {
             </Card>
 
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">Todos</h2>
 
-              {projectDetail.tasks && projectDetail.tasks.length > 0 ? (
+              {taskDetail.todos && taskDetail.todos.length > 0 ? (
                 <div className="space-y-4">
-                  {projectDetail.tasks.map((task) => (
-                    <Card key={task.id}>
+                  {taskDetail.todos.map((todo) => (
+                    <Card key={todo.id}>
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <CardTitle className="text-xl">#{task.id} {task.title}</CardTitle>
-                            {task.description && (
+                            <CardTitle className="text-xl">#{todo.id} {todo.title}</CardTitle>
+                            {todo.description && (
                               <CardDescription className="mt-2">
-                                {task.description}
+                                {todo.description}
                               </CardDescription>
                             )}
                           </div>
                           <div className="flex gap-2">
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              task.status === 'todo' ? 'bg-gray-100 text-gray-700' :
-                              task.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                              todo.status === 'todo' ? 'bg-gray-100 text-gray-700' :
+                              todo.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
                               'bg-green-100 text-green-700'
                             }`}>
-                              {task.status}
+                              {todo.status}
                             </span>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              todo.priority === 'high' ? 'bg-red-100 text-red-700' :
+                              todo.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-700'
                             }`}>
-                              {task.priority}
+                              {todo.priority}
                             </span>
                           </div>
                         </div>
                       </CardHeader>
-                      {task.subtasks && task.subtasks.length > 0 && (
+                      {todo.actions && todo.actions.length > 0 && (
                         <CardContent>
                           <div className="space-y-2">
-                            <p className="text-sm font-medium">Subtasks:</p>
+                            <p className="text-sm font-medium">Actions:</p>
                             <ul className="space-y-1">
-                              {task.subtasks.map((subtask) => (
-                                <li key={subtask.id} className="flex items-center gap-2 text-sm">
+                              {todo.actions.map((action) => (
+                                <li key={action.id} className="flex items-center gap-2 text-sm">
                                   <input
                                     type="checkbox"
-                                    checked={subtask.status === 'done'}
+                                    checked={action.status === 'done'}
                                     readOnly
                                     className="rounded"
                                   />
-                                  <span className={subtask.status === 'done' ? 'line-through text-muted-foreground' : ''}>
-                                    #{subtask.id} {subtask.title}
+                                  <span className={action.status === 'done' ? 'line-through text-muted-foreground' : ''}>
+                                    #{action.id} {action.title}
                                   </span>
                                 </li>
                               ))}
@@ -182,7 +182,7 @@ function App() {
               ) : (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">
-                    <p className="text-muted-foreground">No tasks yet</p>
+                    <p className="text-muted-foreground">No todos yet</p>
                   </CardContent>
                 </Card>
               )}
@@ -190,47 +190,47 @@ function App() {
           </div>
         ) : (
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold tracking-tight">Projects</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
 
-            {projects && projects.length > 0 ? (
+            {tasks && tasks.length > 0 ? (
               <div className="grid gap-4">
-                {projects.map((project) => (
+                {tasks.map((task) => (
                   <Card
-                    key={project.id}
+                    key={task.id}
                     className="cursor-pointer hover:shadow-lg transition-shadow"
-                    onClick={() => setSelectedProjectId(project.id)}
+                    onClick={() => setSelectedTaskId(task.id)}
                   >
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle>#{project.id} {project.title}</CardTitle>
-                          {project.description && (
+                          <CardTitle>#{task.id} {task.title}</CardTitle>
+                          {task.description && (
                             <CardDescription className="mt-2">
-                              {project.description}
+                              {task.description}
                             </CardDescription>
                           )}
                         </div>
                         <div className="flex gap-2">
                           <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            project.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                            project.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            task.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                            task.status === 'completed' ? 'bg-green-100 text-green-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
-                            {project.status}
+                            {task.status}
                           </span>
                           <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            project.priority === 'high' ? 'bg-red-100 text-red-700' :
-                            project.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                            task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                            task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
-                            {project.priority}
+                            {task.priority}
                           </span>
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">
-                        Created: {new Date(project.created_at).toLocaleDateString()}
+                        Created: {new Date(task.created_at).toLocaleDateString()}
                       </p>
                     </CardContent>
                   </Card>
@@ -239,7 +239,7 @@ function App() {
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
-                  <p className="text-muted-foreground">No projects yet</p>
+                  <p className="text-muted-foreground">No tasks yet</p>
                 </CardContent>
               </Card>
             )}
