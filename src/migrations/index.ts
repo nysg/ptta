@@ -1,4 +1,5 @@
 import { PttaDatabase } from '../database';
+import * as crypto from 'crypto';
 
 /**
  * Migration interface
@@ -11,21 +12,71 @@ export interface Migration {
 }
 
 /**
+ * Helper function to get table suffix (same as PttaDatabase.getTableSuffix)
+ */
+function getTableSuffix(workspacePath: string): string {
+  return crypto.createHash('md5').update(workspacePath).digest('hex').substring(0, 8);
+}
+
+/**
  * All migrations in order
  */
 export const migrations: Migration[] = [
-  // Future migrations will be added here
-  // Example:
-  // {
-  //   version: 1,
-  //   name: 'add_tags_column',
-  //   up: (db) => {
-  //     // Add migration logic
-  //   },
-  //   down: (db) => {
-  //     // Add rollback logic
-  //   }
-  // }
+  {
+    version: 1,
+    name: 'add_updated_at_to_subtasks',
+    up: (db) => {
+      const workspaces = db.listWorkspaces();
+
+      for (const workspace of workspaces) {
+        const suffix = getTableSuffix(workspace.path);
+        const tableName = `subtasks_${suffix}`;
+
+        // Check if the table exists
+        const tableExists = (db as any).db
+          .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+          .get(tableName);
+
+        if (!tableExists) {
+          continue;
+        }
+
+        // Check if updated_at column already exists
+        const columns = (db as any).db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+        const hasUpdatedAt = columns.some(col => col.name === 'updated_at');
+
+        if (!hasUpdatedAt) {
+          // Add updated_at column (cannot use DEFAULT CURRENT_TIMESTAMP in ALTER TABLE)
+          (db as any).db.exec(`
+            ALTER TABLE ${tableName}
+            ADD COLUMN updated_at DATETIME
+          `);
+
+          // Update existing rows to have updated_at = created_at
+          // For new rows, this will be set by the application code
+          (db as any).db.exec(`
+            UPDATE ${tableName}
+            SET updated_at = created_at
+          `);
+        }
+      }
+    },
+    down: (db) => {
+      // SQLite doesn't support DROP COLUMN directly
+      // Would require table recreation, which is risky for production data
+      // Leave as no-op for safety
+      const workspaces = db.listWorkspaces();
+
+      for (const workspace of workspaces) {
+        const suffix = getTableSuffix(workspace.path);
+        const tableName = `subtasks_${suffix}`;
+
+        // We could recreate the table without updated_at column here,
+        // but it's safer to leave it as-is for rollback
+        // In production, you'd typically not rollback schema changes
+      }
+    }
+  }
 ];
 
 /**

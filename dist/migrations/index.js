@@ -1,26 +1,101 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.migrations = void 0;
 exports.getCurrentVersion = getCurrentVersion;
 exports.initSchemaVersion = initSchemaVersion;
 exports.migrate = migrate;
 exports.rollback = rollback;
+const crypto = __importStar(require("crypto"));
+/**
+ * Helper function to get table suffix (same as PttaDatabase.getTableSuffix)
+ */
+function getTableSuffix(workspacePath) {
+    return crypto.createHash('md5').update(workspacePath).digest('hex').substring(0, 8);
+}
 /**
  * All migrations in order
  */
 exports.migrations = [
-// Future migrations will be added here
-// Example:
-// {
-//   version: 1,
-//   name: 'add_tags_column',
-//   up: (db) => {
-//     // Add migration logic
-//   },
-//   down: (db) => {
-//     // Add rollback logic
-//   }
-// }
+    {
+        version: 1,
+        name: 'add_updated_at_to_subtasks',
+        up: (db) => {
+            const workspaces = db.listWorkspaces();
+            for (const workspace of workspaces) {
+                const suffix = getTableSuffix(workspace.path);
+                const tableName = `subtasks_${suffix}`;
+                // Check if the table exists
+                const tableExists = db.db
+                    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
+                    .get(tableName);
+                if (!tableExists) {
+                    continue;
+                }
+                // Check if updated_at column already exists
+                const columns = db.db.prepare(`PRAGMA table_info(${tableName})`).all();
+                const hasUpdatedAt = columns.some(col => col.name === 'updated_at');
+                if (!hasUpdatedAt) {
+                    // Add updated_at column (cannot use DEFAULT CURRENT_TIMESTAMP in ALTER TABLE)
+                    db.db.exec(`
+            ALTER TABLE ${tableName}
+            ADD COLUMN updated_at DATETIME
+          `);
+                    // Update existing rows to have updated_at = created_at
+                    // For new rows, this will be set by the application code
+                    db.db.exec(`
+            UPDATE ${tableName}
+            SET updated_at = created_at
+          `);
+                }
+            }
+        },
+        down: (db) => {
+            // SQLite doesn't support DROP COLUMN directly
+            // Would require table recreation, which is risky for production data
+            // Leave as no-op for safety
+            const workspaces = db.listWorkspaces();
+            for (const workspace of workspaces) {
+                const suffix = getTableSuffix(workspace.path);
+                const tableName = `subtasks_${suffix}`;
+                // We could recreate the table without updated_at column here,
+                // but it's safer to leave it as-is for rollback
+                // In production, you'd typically not rollback schema changes
+            }
+        }
+    }
 ];
 /**
  * Get current schema version from database

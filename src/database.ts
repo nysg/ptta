@@ -64,13 +64,7 @@ export class PttaDatabase {
   }
 
   private initDatabase(): void {
-    // Initialize schema version table for migrations
-    initSchemaVersion(this);
-
-    // Run any pending migrations
-    migrate(this);
-
-    // ワークスペーステーブルの作成
+    // ワークスペーステーブルの作成（マイグレーションより先に実行）
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workspaces (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,6 +77,12 @@ export class PttaDatabase {
     `);
 
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path)');
+
+    // Initialize schema version table for migrations
+    initSchemaVersion(this);
+
+    // Run any pending migrations
+    migrate(this);
   }
 
   // パスからテーブル名を生成（ハッシュ化）
