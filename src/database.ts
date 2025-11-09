@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { DatabaseError, NotFoundError } from './utils/errors';
 import { parseMetadata, stringifyMetadata, parseEntityMetadata, buildUpdateQuery } from './utils/json';
+import { createLogger } from './utils/logger';
 import type {
   Workspace,
   Metadata,
@@ -43,6 +44,7 @@ export type {
 export class PttaDatabase {
   private db: Database.Database;
   private dbPath: string;
+  private logger = createLogger({ module: 'PttaDatabase' });
 
   constructor(dbPath?: string) {
     const defaultPath = path.join(os.homedir(), '.ptta', 'ptta.db');
@@ -52,9 +54,11 @@ export class PttaDatabase {
     const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
+      this.logger.info({ dir }, 'Created database directory');
     }
 
     this.db = new Database(this.dbPath);
+    this.logger.info({ dbPath: this.dbPath }, 'Database initialized');
     this.initDatabase();
   }
 
@@ -91,6 +95,7 @@ export class PttaDatabase {
         .get(absolutePath) as Workspace | undefined;
 
       if (existing) {
+        this.logger.debug({ workspaceId: existing.id, path: absolutePath }, 'Using existing workspace');
         return existing;
       }
 
@@ -102,10 +107,14 @@ export class PttaDatabase {
       const suffix = this.getTableSuffix(absolutePath);
       this.createWorkspaceTables(suffix);
 
-      return this.db
+      const workspace = this.db
         .prepare('SELECT * FROM workspaces WHERE id = ?')
         .get(info.lastInsertRowid) as Workspace;
+
+      this.logger.info({ workspaceId: workspace.id, name: workspaceName, path: absolutePath }, 'Created new workspace');
+      return workspace;
     } catch (error) {
+      this.logger.error({ workspacePath, error }, 'Failed to register workspace');
       throw new DatabaseError('Failed to register workspace', error);
     }
   }
@@ -190,8 +199,10 @@ export class PttaDatabase {
       if (!project) {
         throw new DatabaseError('Failed to retrieve created project');
       }
+      this.logger.info({ projectId: project.id, title, workspaceId: workspace.id }, 'Created project');
       return project;
     } catch (error) {
+      this.logger.error({ title, workspacePath, error }, 'Failed to create project');
       if (error instanceof DatabaseError) throw error;
       throw new DatabaseError('Failed to create project', error);
     }

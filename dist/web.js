@@ -40,8 +40,10 @@ const serve_static_1 = require("@hono/node-server/serve-static");
 const database_1 = require("./database");
 const errors_1 = require("./utils/errors");
 const validation_1 = require("./utils/validation");
+const logger_1 = require("./utils/logger");
 const path = __importStar(require("path"));
 const app = new hono_1.Hono();
+const logger = (0, logger_1.createLogger)({ module: 'WebServer' });
 // データベースインスタンス
 const db = new database_1.PttaDatabase();
 // CORS設定
@@ -219,6 +221,7 @@ app.use('/assets/*', (0, serve_static_1.serveStatic)({ root: webClientDist }));
 app.get('/', (0, serve_static_1.serveStatic)({ path: path.join(webClientDist, 'index.html') }));
 // サーバー起動関数
 function startWebServer(port = 3737) {
+    logger.info({ port }, 'Starting WebUI server');
     console.log(`🚀 ptta WebUI server starting on http://localhost:${port}`);
     try {
         const server = (0, node_server_1.serve)({
@@ -228,18 +231,22 @@ function startWebServer(port = 3737) {
         // エラーハンドリング
         server.on('error', (error) => {
             if (error.code === 'EADDRINUSE') {
+                logger.error({ port, errorCode: error.code }, 'Port already in use');
                 console.error(`\n❌ Error: Port ${port} is already in use.`);
                 console.error(`💡 Try using a different port with: ptta web --port <port_number>\n`);
                 process.exit(1);
             }
             else {
+                logger.error({ error }, 'Server error');
                 console.error(`\n❌ Server error:`, error.message);
                 process.exit(1);
             }
         });
+        logger.info({ port }, 'WebUI server started successfully');
         return app;
     }
     catch (error) {
+        logger.error({ error }, 'Failed to start server');
         console.error(`\n❌ Failed to start server:`, (0, errors_1.getErrorMessage)(error));
         process.exit(1);
     }

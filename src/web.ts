@@ -4,9 +4,11 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { PttaDatabase } from './database';
 import { PttaError, getErrorMessage } from './utils/errors';
 import { parseIntSafe } from './utils/validation';
+import { createLogger } from './utils/logger';
 import * as path from 'path';
 
 const app = new Hono();
+const logger = createLogger({ module: 'WebServer' });
 
 // データベースインスタンス
 const db = new PttaDatabase();
@@ -219,6 +221,7 @@ app.get('/', serveStatic({ path: path.join(webClientDist, 'index.html') }));
 
 // サーバー起動関数
 export function startWebServer(port: number = 3737) {
+  logger.info({ port }, 'Starting WebUI server');
   console.log(`🚀 ptta WebUI server starting on http://localhost:${port}`);
 
   try {
@@ -230,17 +233,21 @@ export function startWebServer(port: number = 3737) {
     // エラーハンドリング
     server.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code === 'EADDRINUSE') {
+        logger.error({ port, errorCode: error.code }, 'Port already in use');
         console.error(`\n❌ Error: Port ${port} is already in use.`);
         console.error(`💡 Try using a different port with: ptta web --port <port_number>\n`);
         process.exit(1);
       } else {
+        logger.error({ error }, 'Server error');
         console.error(`\n❌ Server error:`, error.message);
         process.exit(1);
       }
     });
 
+    logger.info({ port }, 'WebUI server started successfully');
     return app;
   } catch (error) {
+    logger.error({ error }, 'Failed to start server');
     console.error(`\n❌ Failed to start server:`, getErrorMessage(error));
     process.exit(1);
   }

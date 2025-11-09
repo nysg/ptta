@@ -3,6 +3,7 @@ export type { Workspace, Metadata, Project, Task, Subtask, Summary, ProjectHiera
 export declare class PttaDatabase {
     private db;
     private dbPath;
+    private logger;
     constructor(dbPath?: string);
     private initDatabase;
     private getTableSuffix;

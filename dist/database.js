@@ -44,16 +44,20 @@ const os = __importStar(require("os"));
 const crypto = __importStar(require("crypto"));
 const errors_1 = require("./utils/errors");
 const json_1 = require("./utils/json");
+const logger_1 = require("./utils/logger");
 class PttaDatabase {
     constructor(dbPath) {
+        this.logger = (0, logger_1.createLogger)({ module: 'PttaDatabase' });
         const defaultPath = path.join(os.homedir(), '.ptta', 'ptta.db');
         this.dbPath = dbPath || defaultPath;
         // ディレクトリが存在しない場合は作成
         const dir = path.dirname(this.dbPath);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
+            this.logger.info({ dir }, 'Created database directory');
         }
         this.db = new better_sqlite3_1.default(this.dbPath);
+        this.logger.info({ dbPath: this.dbPath }, 'Database initialized');
         this.initDatabase();
     }
     initDatabase() {
@@ -84,6 +88,7 @@ class PttaDatabase {
                 .prepare('SELECT * FROM workspaces WHERE path = ?')
                 .get(absolutePath);
             if (existing) {
+                this.logger.debug({ workspaceId: existing.id, path: absolutePath }, 'Using existing workspace');
                 return existing;
             }
             // 新規ワークスペースを作成
@@ -92,11 +97,14 @@ class PttaDatabase {
                 .run(absolutePath, workspaceName);
             const suffix = this.getTableSuffix(absolutePath);
             this.createWorkspaceTables(suffix);
-            return this.db
+            const workspace = this.db
                 .prepare('SELECT * FROM workspaces WHERE id = ?')
                 .get(info.lastInsertRowid);
+            this.logger.info({ workspaceId: workspace.id, name: workspaceName, path: absolutePath }, 'Created new workspace');
+            return workspace;
         }
         catch (error) {
+            this.logger.error({ workspacePath, error }, 'Failed to register workspace');
             throw new errors_1.DatabaseError('Failed to register workspace', error);
         }
     }
@@ -173,9 +181,11 @@ class PttaDatabase {
             if (!project) {
                 throw new errors_1.DatabaseError('Failed to retrieve created project');
             }
+            this.logger.info({ projectId: project.id, title, workspaceId: workspace.id }, 'Created project');
             return project;
         }
         catch (error) {
+            this.logger.error({ title, workspacePath, error }, 'Failed to create project');
             if (error instanceof errors_1.DatabaseError)
                 throw error;
             throw new errors_1.DatabaseError('Failed to create project', error);
