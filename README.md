@@ -1,30 +1,25 @@
 # ptta (Project, Task, Todo, Action)
 
-AIファーストなタスク管理CLI - Claude Codeの外部メモリーストレージ
+AI-first Task Management CLI - External Memory for Claude Code
 
-## 特徴
+**Current Implementation**: Project → Task → Subtask hierarchy
 
-- 📋 **階層的なタスク管理**: プロジェクト → タスク → サブタスク
-- 🤖 **AI最適化**: JSON形式での構造化データ、Claude Codeが読み取りやすい設計
-- 💾 **永続化**: better-sqlite3による高速なデータ管理
-- 📁 **パスごとの管理**: ワークスペースごとに独立したプロジェクト管理
-- 🔍 **効率的なクエリ**: Claude Codeのコンテキストウィンドウを節約
+## Features
 
-## インストール
+- 📋 **Hierarchical Task Management**: Project → Task → Subtask
+- 🤖 **AI-Optimized**: Structured JSON data, designed for easy Claude Code integration
+- 💾 **Persistent Storage**: Fast data management with better-sqlite3
+- 📁 **Workspace-based**: Independent project management per workspace path
+- 🔍 **Efficient Queries**: Save Claude Code's context window
+- 🌐 **Web Interface**: Visual task management via WebUI
 
-### GitHubから直接インストール
-
-```bash
-npm install -g github:nysg/ptta
-```
-
-### npmjsから（将来公開予定）
+## Installation
 
 ```bash
 npm install -g @nysg/ptta
 ```
 
-### ローカル開発
+### Local Development
 
 ```bash
 npm install
@@ -32,147 +27,160 @@ npm run build
 npm link
 ```
 
-## 基本的な使い方
+## WebUI
 
-### プロジェクト管理
+Launch the web interface to manage your tasks visually.
 
 ```bash
-# プロジェクト作成
-ptta project:add "Webアプリ開発" -d "新しいWebアプリケーションの開発" -P high
+# Start WebUI (default port: 3737)
+ptta web
 
-# プロジェクト一覧
-ptta project:list
-
-# プロジェクト詳細（階層表示）
-ptta project:show 1
-
-# JSON形式で表示
-ptta project:list --json
+# Custom port
+ptta web --port 8080
 ```
 
-### タスク管理
+Open <http://localhost:3737> in your browser.
+
+## Basic Usage
+
+### Project Management
 
 ```bash
-# タスク作成
-ptta task:add 1 "認証機能の実装" -d "JWT認証を実装する" -P high
+# Create project
+ptta project:add "Web App Development" -d "New web application project" -P high
 
-# タスク一覧
+# List projects
+ptta project:list
+
+# Show project details (hierarchical view)
+ptta project:show 1
+```
+
+### Task Management
+
+```bash
+# Create task
+ptta task:add 1 "Implement authentication" -d "Implement JWT authentication" -P high
+
+# List tasks
 ptta task:list
 
-# プロジェクト1のタスクのみ表示
+# List tasks for project 1
 ptta task:list -P 1
 
-# タスクのステータス更新
+# Update task status
 ptta task:update 1 -s in_progress
 
-# タスク完了
+# Complete task
 ptta task:update 1 -s done
 ```
 
-### サブタスク管理
+### Subtask Management
 
 ```bash
-# サブタスク追加
-ptta subtask:add 1 "ログイン画面のUI作成"
-ptta subtask:add 1 "JWT生成ロジックの実装"
+# Add subtasks
+ptta subtask:add 1 "Create login UI"
+ptta subtask:add 1 "Implement JWT generation logic"
 
-# サブタスク完了
+# Complete subtask
 ptta subtask:done 1
 ```
 
-### ワークスペース管理
+### Workspace Management
 
 ```bash
-# ワークスペース一覧
+# List workspaces
 ptta workspace:list
 
-# 特定のワークスペースで実行
+# Execute in specific workspace
 ptta -p /path/to/project project:list
 ```
 
-### データエクスポート
+### Data Export
 
 ```bash
-# 全データをJSON出力
+# Export all data as JSON
 ptta export
 
-# 特定プロジェクトをファイルに出力
+# Export specific project to file
 ptta export -P 1 -o project1.json
 
-# 統計情報
+# Show statistics
 ptta stats
 ```
 
-## Claude Codeとの統合
+## Claude Code Integration
 
-### 1. 作業開始時に現在のタスクを確認
+### 1. Check current tasks at work start
 
 ```bash
-# 進行中のタスク一覧をJSON形式で取得
+# Get in-progress tasks in JSON format
 ptta query tasks -s in_progress
 ```
 
-### 2. プロジェクト全体の把握
+### 2. Understand project overview
 
 ```bash
-# プロジェクト階層をJSON形式で取得
+# Get project hierarchy in JSON format
 ptta query hierarchy -i 1
 ```
 
-### 3. 作業完了後の記録
+### 3. Record work completion
 
 ```bash
-# タスク完了とサマリー追加
+# Complete task and add summary
 ptta task:update 5 -s done
-ptta summary:add task 5 "API統合が完了。エラーハンドリングとレート制限を実装。"
+ptta summary:add task 5 "API integration completed. Implemented error handling and rate limiting."
 ```
 
-### 4. AIクエリコマンド（JSON形式）
+### 4. AI Query Commands (JSON format)
 
 ```bash
-# 全プロジェクト
+# All projects
 ptta query projects
 
-# 全タスク
+# All tasks
 ptta query tasks
 
-# 特定プロジェクトの階層
+# Specific project hierarchy
 ptta query hierarchy -i 1
 
-# 全データ
+# All data
 ptta query all
 
-# 統計情報
+# Statistics
 ptta query stats
 
-# ワークスペース一覧
+# Workspace list
 ptta query workspaces
 ```
 
-## データの保存場所
+## Data Storage Location
 
 ```
 ~/.ptta/ptta.db
 ```
 
-## ステータス
+## Status Values
 
-### プロジェクト
-- `active`: アクティブ（進行中）
-- `completed`: 完了
-- `archived`: アーカイブ済み
+### Projects
 
-### タスク/サブタスク
-- `todo`: 未着手
-- `in_progress`: 進行中
-- `done`: 完了
+- `active`: Active (in progress)
+- `completed`: Completed
+- `archived`: Archived
 
-## 優先度
+### Tasks/Subtasks
 
-- `low`: 低
-- `medium`: 中（デフォルト）
-- `high`: 高
+- `todo`: Not started
+- `in_progress`: In progress
+- `done`: Completed
 
-## ライセンス
+## Priority Levels
+
+- `low`: Low
+- `medium`: Medium (default)
+- `high`: High
+
+## License
 
 MIT
