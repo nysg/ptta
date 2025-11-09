@@ -179,7 +179,7 @@ describe('App Routing', () => {
         expect(screen.getByText('2')).toBeInTheDocument() // tasks total
       })
 
-      expect(screen.getByText('1 active, 1 completed')).toBeInTheDocument()
+      expect(screen.getByText(/1 active, 1 done/)).toBeInTheDocument()
     })
 
     it('shows "No tasks yet" when tasks array is empty', async () => {
