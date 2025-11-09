@@ -12,11 +12,19 @@ AIファーストなタスク管理CLI - Claude Codeの外部メモリースト�
 
 ## インストール
 
+### GitHubから直接インストール
+
 ```bash
-npm install -g ptta
+npm install -g github:nysg/ptta
 ```
 
-または、ローカルでの開発:
+### npmjsから（将来公開予定）
+
+```bash
+npm install -g @nysg/ptta
+```
+
+### ローカル開発
 
 ```bash
 npm install
