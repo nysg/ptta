@@ -4,13 +4,19 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { PttaDatabase } from './database';
 import * as fs from 'fs';
+import * as path from 'path';
+
+// package.jsonからバージョンを読み込む
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8')
+);
 
 const program = new Command();
 
 program
   .name('ptta')
   .description('AI-first Task Management CLI - External memory storage for Claude Code')
-  .version('0.1.0');
+  .version(packageJson.version);
 
 // データベースインスタンスを作成して処理を実行するヘルパー
 function withDb(fn: (db: PttaDatabase, workspacePath: string, ...args: any[]) => void | Promise<void>) {
