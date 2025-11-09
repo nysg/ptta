@@ -1,35 +1,39 @@
-# .npmignore - npmパッケージに含めないファイル
-
-# Source files (ビルド済みのdistのみ含める)
+# Source files
 src/
-tsconfig.json
 
-# Tests
-*.test.ts
-*.spec.ts
-__tests__/
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+**/*.test.d.ts
+**/*.test.js.map
+**/*.test.d.ts.map
+
+# Config files
+tsconfig.json
+vitest.config.ts
+.eslintrc.*
+.prettierrc.*
 
 # Development files
-.github/
-CLAUDE.md
 .vscode/
 .idea/
 *.log
+.DS_Store
 
-# web/client のソースファイル (distのみ含める)
-web/client/src/
-web/client/node_modules/
-web/client/public/
-web/client/index.html
-web/client/tsconfig*.json
-web/client/vite.config.ts
-web/client/package*.json
-web/client/postcss.config.js
-web/client/tailwind.config.js
-web/client/components.json
-web/client/.gitignore
-web/client/README.md
+# Git files
+.git/
+.gitignore
 
-# web/client/dist は含める（.gitignoreで除外されているが、npmには含める）
-!web/client/dist
-!web/client/dist/**/*
+# Other
+CLAUDE.md
+node_modules/
+coverage/
+
+# Keep these
+!dist/
+!bin/
+!web/client/dist/
+!README.md
+!LICENSE
+!package.json

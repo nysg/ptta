@@ -8,6 +8,8 @@
   },
   "files": [
     "dist",
+    "!dist/**/__tests__",
+    "!dist/**/*.test.*",
     "bin",
     "!web/client/dist/.gitignore",
     "web/client/dist/**/*",
