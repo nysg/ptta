@@ -92,7 +92,7 @@ function App() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-3xl">{projectDetail.title}</CardTitle>
+                    <CardTitle className="text-3xl">#{projectDetail.id} {projectDetail.title}</CardTitle>
                     {projectDetail.description && (
                       <CardDescription className="mt-2 text-base">
                         {projectDetail.description}
@@ -129,7 +129,7 @@ function App() {
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <CardTitle className="text-xl">{task.title}</CardTitle>
+                            <CardTitle className="text-xl">#{task.id} {task.title}</CardTitle>
                             {task.description && (
                               <CardDescription className="mt-2">
                                 {task.description}
@@ -168,7 +168,7 @@ function App() {
                                     className="rounded"
                                   />
                                   <span className={subtask.status === 'done' ? 'line-through text-muted-foreground' : ''}>
-                                    {subtask.title}
+                                    #{subtask.id} {subtask.title}
                                   </span>
                                 </li>
                               ))}
@@ -203,7 +203,7 @@ function App() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
-                          <CardTitle>{project.title}</CardTitle>
+                          <CardTitle>#{project.id} {project.title}</CardTitle>
                           {project.description && (
                             <CardDescription className="mt-2">
                               {project.description}
