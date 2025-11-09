@@ -1,52 +1,16 @@
-import { useState } from 'react'
+import { Routes, Route, useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Task, type TaskHierarchy, type Workspace } from './lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 
-function App() {
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null)
-  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState<string | null>(null)
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
+function WorkspacesPage() {
+  const navigate = useNavigate()
 
   const { data: workspaces, isLoading: isLoadingWorkspaces } = useQuery<Workspace[]>({
     queryKey: ['workspaces'],
     queryFn: () => api.getWorkspaces(),
   })
-
-  const { data: tasks, isLoading: isLoadingTasks } = useQuery<Task[]>({
-    queryKey: ['tasks', selectedWorkspacePath],
-    queryFn: () => api.getTasks(selectedWorkspacePath || undefined),
-    enabled: selectedWorkspaceId !== null,
-  })
-
-  const { data: taskDetail } = useQuery<TaskHierarchy>({
-    queryKey: ['task', selectedTaskId, selectedWorkspacePath],
-    queryFn: () => api.getTask(selectedTaskId!, selectedWorkspacePath || undefined),
-    enabled: selectedTaskId !== null,
-  })
-
-  const { data: stats } = useQuery({
-    queryKey: ['stats', selectedWorkspacePath],
-    queryFn: () => api.getStats(selectedWorkspacePath || undefined),
-    enabled: selectedWorkspaceId !== null,
-  })
-
-  const handleWorkspaceSelect = (workspace: Workspace) => {
-    setSelectedWorkspaceId(workspace.id)
-    setSelectedWorkspacePath(workspace.path)
-    setSelectedTaskId(null)
-  }
-
-  const handleBackToWorkspaces = () => {
-    setSelectedWorkspaceId(null)
-    setSelectedWorkspacePath(null)
-    setSelectedTaskId(null)
-  }
-
-  const handleBackToTasks = () => {
-    setSelectedTaskId(null)
-  }
 
   if (isLoadingWorkspaces) {
     return (
@@ -64,97 +28,217 @@ function App() {
             <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
             <p className="text-muted-foreground">AI-first Task Management</p>
           </div>
-          {selectedTaskId && (
-            <Button variant="outline" onClick={handleBackToTasks}>
-              Back to Tasks
-            </Button>
+        </div>
+
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-tight">Workspaces</h2>
+
+          {workspaces && workspaces.length > 0 ? (
+            <div className="grid gap-4">
+              {workspaces.map((workspace) => (
+                <Card
+                  key={workspace.id}
+                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => navigate(`/workspaces/${workspace.id}`)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle>#{workspace.id} {workspace.name}</CardTitle>
+                        <CardDescription className="mt-2">
+                          {workspace.path}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Created: {new Date(workspace.created_at).toLocaleDateString()}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-muted-foreground">No workspaces yet</p>
+              </CardContent>
+            </Card>
           )}
-          {!selectedTaskId && selectedWorkspaceId && (
-            <Button variant="outline" onClick={handleBackToWorkspaces}>
-              Back to Workspaces
-            </Button>
-          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TasksPage() {
+  const { workspaceId } = useParams<{ workspaceId: string }>()
+  const navigate = useNavigate()
+
+  const { data: workspaces } = useQuery<Workspace[]>({
+    queryKey: ['workspaces'],
+    queryFn: () => api.getWorkspaces(),
+  })
+
+  const workspace = workspaces?.find(w => w.id === Number(workspaceId))
+
+  const { data: tasks, isLoading: isLoadingTasks } = useQuery<Task[]>({
+    queryKey: ['tasks', workspace?.path],
+    queryFn: () => api.getTasks(workspace?.path || undefined),
+    enabled: !!workspace,
+  })
+
+  const { data: stats } = useQuery({
+    queryKey: ['stats', workspace?.path],
+    queryFn: () => api.getStats(workspace?.path || undefined),
+    enabled: !!workspace,
+  })
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
+            <p className="text-muted-foreground">AI-first Task Management</p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/')}>
+            Back to Workspaces
+          </Button>
         </div>
 
         {stats && (
-          <div className="grid gap-4 md:grid-cols-3 mb-8">
+          <div className="grid gap-2 md:grid-cols-3 mb-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tasks</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.tasks.total}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.tasks.active} active, {stats.tasks.completed} completed
-                </p>
+              <CardContent className="py-2 px-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">Tasks</span>
+                  <span className="font-bold">{stats.tasks.total}</span>
+                  <span className="text-muted-foreground text-xs">{stats.tasks.active} active, {stats.tasks.completed} done</span>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Todos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.todos.total}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.todos.inProgress} in progress, {stats.todos.done} done
-                </p>
+              <CardContent className="py-2 px-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">Todos</span>
+                  <span className="font-bold">{stats.todos.total}</span>
+                  <span className="text-muted-foreground text-xs">{stats.todos.inProgress} in progress, {stats.todos.done} done</span>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.actions.total}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.actions.todo} todo, {stats.actions.done} done
-                </p>
+              <CardContent className="py-2 px-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">Actions</span>
+                  <span className="font-bold">{stats.actions.total}</span>
+                  <span className="text-muted-foreground text-xs">{stats.actions.todo} todo, {stats.actions.done} done</span>
+                </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {!selectedWorkspaceId ? (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold tracking-tight">Workspaces</h2>
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
 
-            {workspaces && workspaces.length > 0 ? (
-              <div className="grid gap-4">
-                {workspaces.map((workspace) => (
-                  <Card
-                    key={workspace.id}
-                    className="cursor-pointer hover:shadow-lg transition-shadow"
-                    onClick={() => handleWorkspaceSelect(workspace)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle>#{workspace.id} {workspace.name}</CardTitle>
+          {isLoadingTasks ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-muted-foreground">Loading tasks...</p>
+              </CardContent>
+            </Card>
+          ) : tasks && tasks.length > 0 ? (
+            <div className="grid gap-4">
+              {tasks.map((task) => (
+                <Card
+                  key={task.id}
+                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => navigate(`/workspaces/${workspaceId}/tasks/${task.id}`)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle>#{task.id} {task.title}</CardTitle>
+                        {task.description && (
                           <CardDescription className="mt-2">
-                            {workspace.path}
+                            {task.description}
                           </CardDescription>
-                        </div>
+                        )}
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created: {new Date(workspace.created_at).toLocaleDateString()}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <p className="text-muted-foreground">No workspaces yet</p>
-                </CardContent>
-              </Card>
-            )}
+                      <div className="flex gap-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          task.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                          task.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {task.status}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {task.priority}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Created: {new Date(task.created_at).toLocaleDateString()}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-muted-foreground">No tasks yet</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TaskDetailPage() {
+  const { workspaceId, taskId } = useParams<{ workspaceId: string; taskId: string }>()
+  const navigate = useNavigate()
+
+  const { data: workspaces } = useQuery<Workspace[]>({
+    queryKey: ['workspaces'],
+    queryFn: () => api.getWorkspaces(),
+  })
+
+  const workspace = workspaces?.find(w => w.id === Number(workspaceId))
+
+  const { data: taskDetail } = useQuery<TaskHierarchy>({
+    queryKey: ['task', taskId, workspace?.path],
+    queryFn: () => api.getTask(Number(taskId), workspace?.path || undefined),
+    enabled: !!workspace && !!taskId,
+  })
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
+            <p className="text-muted-foreground">AI-first Task Management</p>
           </div>
-        ) : selectedTaskId && taskDetail ? (
+          <Button variant="outline" onClick={() => navigate(`/workspaces/${workspaceId}`)}>
+            Back to Tasks
+          </Button>
+        </div>
+
+        {taskDetail && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -256,71 +340,19 @@ function App() {
               )}
             </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
-
-            {isLoadingTasks ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <p className="text-muted-foreground">Loading tasks...</p>
-                </CardContent>
-              </Card>
-            ) : tasks && tasks.length > 0 ? (
-              <div className="grid gap-4">
-                {tasks.map((task) => (
-                  <Card
-                    key={task.id}
-                    className="cursor-pointer hover:shadow-lg transition-shadow"
-                    onClick={() => setSelectedTaskId(task.id)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle>#{task.id} {task.title}</CardTitle>
-                          {task.description && (
-                            <CardDescription className="mt-2">
-                              {task.description}
-                            </CardDescription>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            task.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                            task.status === 'completed' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {task.status}
-                          </span>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                            task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {task.priority}
-                          </span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created: {new Date(task.created_at).toLocaleDateString()}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <p className="text-muted-foreground">No tasks yet</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
         )}
       </div>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<WorkspacesPage />} />
+      <Route path="/workspaces/:workspaceId" element={<TasksPage />} />
+      <Route path="/workspaces/:workspaceId/tasks/:taskId" element={<TaskDetailPage />} />
+    </Routes>
   )
 }
 
