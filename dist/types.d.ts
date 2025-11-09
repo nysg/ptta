@@ -40,6 +40,7 @@ export interface Subtask {
     status: string;
     metadata?: Metadata;
     created_at: string;
+    updated_at: string;
     completed_at?: string;
 }
 export interface Summary {

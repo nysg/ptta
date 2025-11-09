@@ -169,6 +169,7 @@ export class PttaDatabase {
         status TEXT DEFAULT 'todo',
         metadata TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         completed_at DATETIME,
         FOREIGN KEY (task_id) REFERENCES tasks_${suffix}(id) ON DELETE CASCADE
       )
