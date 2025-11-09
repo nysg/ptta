@@ -181,7 +181,7 @@ app.use('/assets/*', serveStatic({ root: webClientDist }));
 app.get('/', serveStatic({ path: path.join(webClientDist, 'index.html') }));
 
 // サーバー起動関数
-export function startWebServer(port: number = 3000) {
+export function startWebServer(port: number = 3737) {
   console.log(`🚀 ptta WebUI server starting on http://localhost:${port}`);
 
   try {
@@ -211,6 +211,6 @@ export function startWebServer(port: number = 3000) {
 
 // 直接実行された場合
 if (require.main === module) {
-  const port = parseInt(process.env.PORT || '3000');
+  const port = parseInt(process.env.PORT || '3737');
   startWebServer(port);
 }

@@ -385,7 +385,7 @@ program
 program
     .command('web')
     .description('Start WebUI server')
-    .option('--port <port>', 'Server port', '3000')
+    .option('--port <port>', 'Server port', '3737')
     .action(async (options) => {
     const { startWebServer } = await Promise.resolve().then(() => __importStar(require('./web')));
     const port = parseInt(options.port);
