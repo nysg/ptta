@@ -2,6 +2,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export type Metadata = Record<string, unknown>;
 
+export interface Workspace {
+  id: number;
+  path: string;
+  name: string;
+  created_at: string;
+}
+
 export interface Summary {
   id: number;
   entity_type: string;
@@ -95,6 +102,16 @@ export interface ActionUpdate {
 
 // API Client
 export const api = {
+  // Workspaces
+  async getWorkspaces(): Promise<Workspace[]> {
+    const response = await fetch(`${API_BASE_URL}/workspaces`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch workspaces' }));
+      throw new Error(error.error || 'Failed to fetch workspaces');
+    }
+    return response.json();
+  },
+
   // Tasks
   async getTasks(path?: string, status?: string): Promise<Task[]> {
     const params = new URLSearchParams();

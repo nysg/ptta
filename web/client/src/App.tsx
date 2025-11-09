@@ -1,29 +1,54 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, type Task, type TaskHierarchy } from './lib/api'
+import { api, type Task, type TaskHierarchy, type Workspace } from './lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 
 function App() {
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null)
+  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
 
-  const { data: tasks, isLoading } = useQuery<Task[]>({
-    queryKey: ['tasks'],
-    queryFn: () => api.getTasks(),
+  const { data: workspaces, isLoading: isLoadingWorkspaces } = useQuery<Workspace[]>({
+    queryKey: ['workspaces'],
+    queryFn: () => api.getWorkspaces(),
+  })
+
+  const { data: tasks, isLoading: isLoadingTasks } = useQuery<Task[]>({
+    queryKey: ['tasks', selectedWorkspacePath],
+    queryFn: () => api.getTasks(selectedWorkspacePath || undefined),
+    enabled: selectedWorkspaceId !== null,
   })
 
   const { data: taskDetail } = useQuery<TaskHierarchy>({
-    queryKey: ['task', selectedTaskId],
-    queryFn: () => api.getTask(selectedTaskId!),
+    queryKey: ['task', selectedTaskId, selectedWorkspacePath],
+    queryFn: () => api.getTask(selectedTaskId!, selectedWorkspacePath || undefined),
     enabled: selectedTaskId !== null,
   })
 
   const { data: stats } = useQuery({
-    queryKey: ['stats'],
-    queryFn: () => api.getStats(),
+    queryKey: ['stats', selectedWorkspacePath],
+    queryFn: () => api.getStats(selectedWorkspacePath || undefined),
+    enabled: selectedWorkspaceId !== null,
   })
 
-  if (isLoading) {
+  const handleWorkspaceSelect = (workspace: Workspace) => {
+    setSelectedWorkspaceId(workspace.id)
+    setSelectedWorkspacePath(workspace.path)
+    setSelectedTaskId(null)
+  }
+
+  const handleBackToWorkspaces = () => {
+    setSelectedWorkspaceId(null)
+    setSelectedWorkspacePath(null)
+    setSelectedTaskId(null)
+  }
+
+  const handleBackToTasks = () => {
+    setSelectedTaskId(null)
+  }
+
+  if (isLoadingWorkspaces) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
@@ -40,8 +65,13 @@ function App() {
             <p className="text-muted-foreground">AI-first Task Management</p>
           </div>
           {selectedTaskId && (
-            <Button variant="outline" onClick={() => setSelectedTaskId(null)}>
+            <Button variant="outline" onClick={handleBackToTasks}>
               Back to Tasks
+            </Button>
+          )}
+          {!selectedTaskId && selectedWorkspaceId && (
+            <Button variant="outline" onClick={handleBackToWorkspaces}>
+              Back to Workspaces
             </Button>
           )}
         </div>
@@ -86,7 +116,45 @@ function App() {
           </div>
         )}
 
-        {selectedTaskId && taskDetail ? (
+        {!selectedWorkspaceId ? (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold tracking-tight">Workspaces</h2>
+
+            {workspaces && workspaces.length > 0 ? (
+              <div className="grid gap-4">
+                {workspaces.map((workspace) => (
+                  <Card
+                    key={workspace.id}
+                    className="cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => handleWorkspaceSelect(workspace)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle>#{workspace.id} {workspace.name}</CardTitle>
+                          <CardDescription className="mt-2">
+                            {workspace.path}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Created: {new Date(workspace.created_at).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <p className="text-muted-foreground">No workspaces yet</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : selectedTaskId && taskDetail ? (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -192,7 +260,13 @@ function App() {
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
 
-            {tasks && tasks.length > 0 ? (
+            {isLoadingTasks ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <p className="text-muted-foreground">Loading tasks...</p>
+                </CardContent>
+              </Card>
+            ) : tasks && tasks.length > 0 ? (
               <div className="grid gap-4">
                 {tasks.map((task) => (
                   <Card
