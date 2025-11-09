@@ -70,6 +70,29 @@ export interface Stats {
   };
 }
 
+// Update types for partial updates
+export interface ProjectUpdate {
+  title?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  metadata?: Metadata;
+}
+
+export interface TaskUpdate {
+  title?: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  metadata?: Metadata;
+}
+
+export interface SubtaskUpdate {
+  title?: string;
+  status?: string;
+  metadata?: Metadata;
+}
+
 // API Client
 export const api = {
   // Projects
@@ -114,7 +137,7 @@ export const api = {
     return response.json();
   },
 
-  async updateProject(id: number, data: Partial<Project>, path?: string): Promise<Project> {
+  async updateProject(id: number, data: ProjectUpdate, path?: string): Promise<Project> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 
@@ -161,7 +184,7 @@ export const api = {
     return response.json();
   },
 
-  async updateTask(id: number, data: Partial<Task>, path?: string): Promise<Task> {
+  async updateTask(id: number, data: TaskUpdate, path?: string): Promise<Task> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 
@@ -194,7 +217,7 @@ export const api = {
     return response.json();
   },
 
-  async updateSubtask(id: number, data: Partial<Subtask>, path?: string): Promise<Subtask> {
+  async updateSubtask(id: number, data: SubtaskUpdate, path?: string): Promise<Subtask> {
     const params = new URLSearchParams();
     if (path) params.append('path', path);
 

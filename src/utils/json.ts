@@ -44,8 +44,8 @@ export function parseEntityMetadata<T extends { metadata?: string | Metadata }>(
  * @param autoCompleted Whether to auto-set completed_at for done/completed status
  * @returns Object containing fields array and values array for SQL UPDATE query
  */
-export function buildUpdateQuery<T extends Record<string, unknown>>(
-  updates: Partial<T>,
+export function buildUpdateQuery(
+  updates: Partial<Record<string, unknown>>,
   excludeKeys: string[] = ['id', 'created_at'],
   autoCompleted: boolean = false
 ): { fields: string[]; values: (string | number | null)[] } {

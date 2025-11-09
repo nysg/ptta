@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { PttaDatabase } from './database';
+import type { ProjectUpdate, TaskUpdate, SubtaskUpdate } from './database';
 import { PttaError, getErrorMessage } from './utils/errors';
 import { parseIntSafe } from './utils/validation';
 import * as fs from 'fs';
@@ -152,7 +153,7 @@ program
   .option('-d, --description <desc>', 'New description')
   .option('-P, --priority <priority>', 'New priority')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: Partial<import('./database').Project> = {};
+    const updates: ProjectUpdate = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
     if (options.description) updates.description = options.description;
@@ -222,7 +223,7 @@ program
   .option('-d, --description <desc>', 'New description')
   .option('-P, --priority <priority>', 'New priority')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: Partial<import('./database').Task> = {};
+    const updates: TaskUpdate = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
     if (options.description) updates.description = options.description;
@@ -264,7 +265,7 @@ program
   .option('-s, --status <status>', 'New status (todo/done)')
   .option('-t, --title <title>', 'New title')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: Partial<import('./database').Subtask> = {};
+    const updates: SubtaskUpdate = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
 

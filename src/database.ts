@@ -5,10 +5,40 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { DatabaseError, NotFoundError } from './utils/errors';
 import { parseMetadata, stringifyMetadata, parseEntityMetadata, buildUpdateQuery } from './utils/json';
-import type { Workspace, Metadata, Project, Task, Subtask, Summary, ProjectHierarchy, Stats } from './types';
+import type {
+  Workspace,
+  Metadata,
+  Project,
+  Task,
+  Subtask,
+  Summary,
+  ProjectHierarchy,
+  Stats,
+  ProjectCreateInput,
+  TaskCreateInput,
+  SubtaskCreateInput,
+  ProjectUpdate,
+  TaskUpdate,
+  SubtaskUpdate
+} from './types';
 
 // Re-export types for backward compatibility
-export type { Workspace, Metadata, Project, Task, Subtask, Summary, ProjectHierarchy, Stats };
+export type {
+  Workspace,
+  Metadata,
+  Project,
+  Task,
+  Subtask,
+  Summary,
+  ProjectHierarchy,
+  Stats,
+  ProjectCreateInput,
+  TaskCreateInput,
+  SubtaskCreateInput,
+  ProjectUpdate,
+  TaskUpdate,
+  SubtaskUpdate
+};
 
 export class PttaDatabase {
   private db: Database.Database;
@@ -207,7 +237,7 @@ export class PttaDatabase {
     }
   }
 
-  updateProject(workspacePath: string, id: number, updates: Partial<Project>): Project | null {
+  updateProject(workspacePath: string, id: number, updates: ProjectUpdate): Project | null {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
@@ -289,7 +319,7 @@ export class PttaDatabase {
     }
   }
 
-  updateTask(workspacePath: string, id: number, updates: Partial<Task>): Task | null {
+  updateTask(workspacePath: string, id: number, updates: TaskUpdate): Task | null {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);
@@ -358,7 +388,7 @@ export class PttaDatabase {
     }
   }
 
-  updateSubtask(workspacePath: string, id: number, updates: Partial<Subtask>): Subtask | null {
+  updateSubtask(workspacePath: string, id: number, updates: SubtaskUpdate): Subtask | null {
     try {
       const workspace = this.registerWorkspace(workspacePath);
       const suffix = this.getTableSuffix(workspace.path);

@@ -74,4 +74,41 @@ export interface Stats {
         done: number;
     };
 }
+export interface ProjectCreateInput {
+    title: string;
+    description?: string;
+    priority?: string;
+    metadata?: Metadata;
+}
+export interface TaskCreateInput {
+    project_id: number;
+    title: string;
+    description?: string;
+    priority?: string;
+    metadata?: Metadata;
+}
+export interface SubtaskCreateInput {
+    task_id: number;
+    title: string;
+    metadata?: Metadata;
+}
+export interface ProjectUpdate extends Partial<Record<string, unknown>> {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    metadata?: Metadata;
+}
+export interface TaskUpdate extends Partial<Record<string, unknown>> {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    metadata?: Metadata;
+}
+export interface SubtaskUpdate extends Partial<Record<string, unknown>> {
+    title?: string;
+    status?: string;
+    metadata?: Metadata;
+}
 //# sourceMappingURL=types.d.ts.map

@@ -20,7 +20,7 @@ export declare function parseEntityMetadata<T extends {
  * @param autoCompleted Whether to auto-set completed_at for done/completed status
  * @returns Object containing fields array and values array for SQL UPDATE query
  */
-export declare function buildUpdateQuery<T extends Record<string, unknown>>(updates: Partial<T>, excludeKeys?: string[], autoCompleted?: boolean): {
+export declare function buildUpdateQuery(updates: Partial<Record<string, unknown>>, excludeKeys?: string[], autoCompleted?: boolean): {
     fields: string[];
     values: (string | number | null)[];
 };
