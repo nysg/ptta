@@ -27,6 +27,23 @@ export declare class PttaDatabase {
     exportAsJson(workspacePath: string, projectId?: number): ProjectHierarchy | null | (ProjectHierarchy | null)[];
     getStats(workspacePath: string): Stats;
     listWorkspaces(): Workspace[];
+    /**
+     * Execute a function within a transaction
+     * Automatically handles commit on success and rollback on error
+     */
+    transaction<T>(fn: () => T): T;
+    /**
+     * Begin a transaction manually (for advanced use cases)
+     */
+    beginTransaction(): void;
+    /**
+     * Commit the current transaction
+     */
+    commit(): void;
+    /**
+     * Rollback the current transaction
+     */
+    rollback(): void;
     close(): void;
 }
 //# sourceMappingURL=database.d.ts.map

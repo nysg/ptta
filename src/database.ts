@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { DatabaseError, NotFoundError } from './utils/errors';
 import { parseMetadata, stringifyMetadata, parseEntityMetadata, buildUpdateQuery } from './utils/json';
 import { createLogger } from './utils/logger';
+import { initSchemaVersion, migrate } from './migrations';
 import type {
   Workspace,
   Metadata,
@@ -63,6 +64,12 @@ export class PttaDatabase {
   }
 
   private initDatabase(): void {
+    // Initialize schema version table for migrations
+    initSchemaVersion(this);
+
+    // Run any pending migrations
+    migrate(this);
+
     // ワークスペーステーブルの作成
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workspaces (
@@ -524,6 +531,36 @@ export class PttaDatabase {
     } catch (error) {
       throw new DatabaseError('Failed to list workspaces', error);
     }
+  }
+
+  /**
+   * Execute a function within a transaction
+   * Automatically handles commit on success and rollback on error
+   */
+  transaction<T>(fn: () => T): T {
+    const trx = this.db.transaction(fn);
+    return trx();
+  }
+
+  /**
+   * Begin a transaction manually (for advanced use cases)
+   */
+  beginTransaction(): void {
+    this.db.exec('BEGIN TRANSACTION');
+  }
+
+  /**
+   * Commit the current transaction
+   */
+  commit(): void {
+    this.db.exec('COMMIT');
+  }
+
+  /**
+   * Rollback the current transaction
+   */
+  rollback(): void {
+    this.db.exec('ROLLBACK');
   }
 
   close(): void {

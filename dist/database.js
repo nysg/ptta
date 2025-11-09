@@ -45,6 +45,7 @@ const crypto = __importStar(require("crypto"));
 const errors_1 = require("./utils/errors");
 const json_1 = require("./utils/json");
 const logger_1 = require("./utils/logger");
+const migrations_1 = require("./migrations");
 class PttaDatabase {
     constructor(dbPath) {
         this.logger = (0, logger_1.createLogger)({ module: 'PttaDatabase' });
@@ -61,6 +62,10 @@ class PttaDatabase {
         this.initDatabase();
     }
     initDatabase() {
+        // Initialize schema version table for migrations
+        (0, migrations_1.initSchemaVersion)(this);
+        // Run any pending migrations
+        (0, migrations_1.migrate)(this);
         // ワークスペーステーブルの作成
         this.db.exec(`
       CREATE TABLE IF NOT EXISTS workspaces (
@@ -469,6 +474,32 @@ class PttaDatabase {
         catch (error) {
             throw new errors_1.DatabaseError('Failed to list workspaces', error);
         }
+    }
+    /**
+     * Execute a function within a transaction
+     * Automatically handles commit on success and rollback on error
+     */
+    transaction(fn) {
+        const trx = this.db.transaction(fn);
+        return trx();
+    }
+    /**
+     * Begin a transaction manually (for advanced use cases)
+     */
+    beginTransaction() {
+        this.db.exec('BEGIN TRANSACTION');
+    }
+    /**
+     * Commit the current transaction
+     */
+    commit() {
+        this.db.exec('COMMIT');
+    }
+    /**
+     * Rollback the current transaction
+     */
+    rollback() {
+        this.db.exec('ROLLBACK');
     }
     close() {
         this.db.close();
