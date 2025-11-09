@@ -1,10 +1,44 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startWebServer = startWebServer;
 const hono_1 = require("hono");
 const node_server_1 = require("@hono/node-server");
 const serve_static_1 = require("@hono/node-server/serve-static");
 const database_1 = require("./database");
+const path = __importStar(require("path"));
 const app = new hono_1.Hono();
 // データベースインスタンス
 const db = new database_1.PttaDatabase();
@@ -136,16 +170,37 @@ app.get('/api/stats', (c) => {
     return c.json(stats);
 });
 // 静的ファイル配信（本番用）
-app.use('/assets/*', (0, serve_static_1.serveStatic)({ root: './web/client/dist' }));
-app.get('/', (0, serve_static_1.serveStatic)({ path: './web/client/dist/index.html' }));
+// グローバルインストール対応: 絶対パスで解決
+const baseDir = path.join(__dirname, '..');
+const webClientDist = path.join(baseDir, 'web/client/dist');
+app.use('/assets/*', (0, serve_static_1.serveStatic)({ root: webClientDist }));
+app.get('/', (0, serve_static_1.serveStatic)({ path: path.join(webClientDist, 'index.html') }));
 // サーバー起動関数
 function startWebServer(port = 3000) {
     console.log(`🚀 ptta WebUI server starting on http://localhost:${port}`);
-    (0, node_server_1.serve)({
-        fetch: app.fetch,
-        port
-    });
-    return app;
+    try {
+        const server = (0, node_server_1.serve)({
+            fetch: app.fetch,
+            port
+        });
+        // エラーハンドリング
+        server.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`\n❌ Error: Port ${port} is already in use.`);
+                console.error(`💡 Try using a different port with: ptta web --port <port_number>\n`);
+                process.exit(1);
+            }
+            else {
+                console.error(`\n❌ Server error:`, error.message);
+                process.exit(1);
+            }
+        });
+        return app;
+    }
+    catch (error) {
+        console.error(`\n❌ Failed to start server:`, error.message);
+        process.exit(1);
+    }
 }
 // 直接実行された場合
 if (require.main === module) {

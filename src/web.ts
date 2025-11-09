@@ -173,19 +173,40 @@ app.get('/api/stats', (c) => {
 });
 
 // 静的ファイル配信（本番用）
-app.use('/assets/*', serveStatic({ root: './web/client/dist' }));
-app.get('/', serveStatic({ path: './web/client/dist/index.html' }));
+// グローバルインストール対応: 絶対パスで解決
+const baseDir = path.join(__dirname, '..');
+const webClientDist = path.join(baseDir, 'web/client/dist');
+
+app.use('/assets/*', serveStatic({ root: webClientDist }));
+app.get('/', serveStatic({ path: path.join(webClientDist, 'index.html') }));
 
 // サーバー起動関数
 export function startWebServer(port: number = 3000) {
   console.log(`🚀 ptta WebUI server starting on http://localhost:${port}`);
 
-  serve({
-    fetch: app.fetch,
-    port
-  });
+  try {
+    const server = serve({
+      fetch: app.fetch,
+      port
+    });
 
-  return app;
+    // エラーハンドリング
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`\n❌ Error: Port ${port} is already in use.`);
+        console.error(`💡 Try using a different port with: ptta web --port <port_number>\n`);
+        process.exit(1);
+      } else {
+        console.error(`\n❌ Server error:`, error.message);
+        process.exit(1);
+      }
+    });
+
+    return app;
+  } catch (error: any) {
+    console.error(`\n❌ Failed to start server:`, error.message);
+    process.exit(1);
+  }
 }
 
 // 直接実行された場合
