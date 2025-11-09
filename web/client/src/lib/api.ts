@@ -1,12 +1,23 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+export type Metadata = Record<string, unknown>;
+
+export interface Summary {
+  id: number;
+  entity_type: string;
+  entity_id: number;
+  summary: string;
+  metadata?: Metadata;
+  created_at: string;
+}
+
 export interface Project {
   id: number;
   title: string;
   description?: string;
   status: string;
   priority: string;
-  metadata?: any;
+  metadata?: Metadata;
   created_at: string;
   updated_at: string;
   completed_at?: string;
@@ -19,7 +30,7 @@ export interface Task {
   description?: string;
   status: string;
   priority: string;
-  metadata?: any;
+  metadata?: Metadata;
   created_at: string;
   updated_at: string;
   completed_at?: string;
@@ -30,14 +41,14 @@ export interface Subtask {
   task_id: number;
   title: string;
   status: string;
-  metadata?: any;
+  metadata?: Metadata;
   created_at: string;
   completed_at?: string;
 }
 
 export interface ProjectHierarchy extends Project {
   tasks?: (Task & { subtasks?: Subtask[] })[];
-  summaries?: any[];
+  summaries?: Summary[];
 }
 
 export interface Stats {
@@ -68,6 +79,10 @@ export const api = {
     if (status) params.append('status', status);
 
     const response = await fetch(`${API_BASE_URL}/projects?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch projects' }));
+      throw new Error(error.error || 'Failed to fetch projects');
+    }
     return response.json();
   },
 
@@ -76,6 +91,10 @@ export const api = {
     if (path) params.append('path', path);
 
     const response = await fetch(`${API_BASE_URL}/projects/${id}?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch project' }));
+      throw new Error(error.error || 'Failed to fetch project');
+    }
     return response.json();
   },
 
@@ -88,6 +107,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create project' }));
+      throw new Error(error.error || 'Failed to create project');
+    }
     return response.json();
   },
 
@@ -100,6 +123,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update project' }));
+      throw new Error(error.error || 'Failed to update project');
+    }
     return response.json();
   },
 
@@ -111,6 +138,10 @@ export const api = {
     if (status) params.append('status', status);
 
     const response = await fetch(`${API_BASE_URL}/tasks?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch tasks' }));
+      throw new Error(error.error || 'Failed to fetch tasks');
+    }
     return response.json();
   },
 
@@ -123,6 +154,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create task' }));
+      throw new Error(error.error || 'Failed to create task');
+    }
     return response.json();
   },
 
@@ -135,6 +170,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update task' }));
+      throw new Error(error.error || 'Failed to update task');
+    }
     return response.json();
   },
 
@@ -148,6 +187,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to create subtask' }));
+      throw new Error(error.error || 'Failed to create subtask');
+    }
     return response.json();
   },
 
@@ -160,6 +203,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update subtask' }));
+      throw new Error(error.error || 'Failed to update subtask');
+    }
     return response.json();
   },
 
@@ -169,6 +216,10 @@ export const api = {
     if (path) params.append('path', path);
 
     const response = await fetch(`${API_BASE_URL}/stats?${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch stats' }));
+      throw new Error(error.error || 'Failed to fetch stats');
+    }
     return response.json();
   },
 };

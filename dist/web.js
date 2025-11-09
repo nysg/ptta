@@ -38,6 +38,8 @@ const hono_1 = require("hono");
 const node_server_1 = require("@hono/node-server");
 const serve_static_1 = require("@hono/node-server/serve-static");
 const database_1 = require("./database");
+const errors_1 = require("./utils/errors");
+const validation_1 = require("./utils/validation");
 const path = __importStar(require("path"));
 const app = new hono_1.Hono();
 // データベースインスタンス
@@ -70,13 +72,21 @@ app.get('/api/projects', (c) => {
 });
 // プロジェクト詳細（階層）
 app.get('/api/projects/:id', (c) => {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseInt(c.req.param('id'));
-    const hierarchy = db.getProjectHierarchy(workspacePath, id);
-    if (!hierarchy) {
-        return c.json({ error: 'Project not found' }, 404);
+    try {
+        const workspacePath = c.req.query('path') || process.cwd();
+        const id = (0, validation_1.parseIntSafe)(c.req.param('id'), 'project ID');
+        const hierarchy = db.getProjectHierarchy(workspacePath, id);
+        if (!hierarchy) {
+            return c.json({ error: 'Project not found' }, 404);
+        }
+        return c.json(hierarchy);
     }
-    return c.json(hierarchy);
+    catch (error) {
+        if (error instanceof errors_1.PttaError) {
+            return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: (0, errors_1.getErrorMessage)(error) }, 500);
+    }
 });
 // プロジェクト作成
 app.post('/api/projects', async (c) => {
@@ -91,22 +101,38 @@ app.post('/api/projects', async (c) => {
 });
 // プロジェクト更新
 app.patch('/api/projects/:id', async (c) => {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseInt(c.req.param('id'));
-    const body = await c.req.json();
-    const project = db.updateProject(workspacePath, id, body);
-    if (!project) {
-        return c.json({ error: 'Project not found' }, 404);
+    try {
+        const workspacePath = c.req.query('path') || process.cwd();
+        const id = (0, validation_1.parseIntSafe)(c.req.param('id'), 'project ID');
+        const body = await c.req.json();
+        const project = db.updateProject(workspacePath, id, body);
+        if (!project) {
+            return c.json({ error: 'Project not found' }, 404);
+        }
+        return c.json(project);
     }
-    return c.json(project);
+    catch (error) {
+        if (error instanceof errors_1.PttaError) {
+            return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: (0, errors_1.getErrorMessage)(error) }, 500);
+    }
 });
 // タスク一覧
 app.get('/api/tasks', (c) => {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const projectId = c.req.query('projectId') ? parseInt(c.req.query('projectId')) : undefined;
-    const status = c.req.query('status');
-    const tasks = db.listTasks(workspacePath, projectId, status);
-    return c.json(tasks);
+    try {
+        const workspacePath = c.req.query('path') || process.cwd();
+        const projectId = c.req.query('projectId') ? (0, validation_1.parseIntSafe)(c.req.query('projectId'), 'project ID') : undefined;
+        const status = c.req.query('status');
+        const tasks = db.listTasks(workspacePath, projectId, status);
+        return c.json(tasks);
+    }
+    catch (error) {
+        if (error instanceof errors_1.PttaError) {
+            return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: (0, errors_1.getErrorMessage)(error) }, 500);
+    }
 });
 // タスク作成
 app.post('/api/tasks', async (c) => {
@@ -121,14 +147,22 @@ app.post('/api/tasks', async (c) => {
 });
 // タスク更新
 app.patch('/api/tasks/:id', async (c) => {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseInt(c.req.param('id'));
-    const body = await c.req.json();
-    const task = db.updateTask(workspacePath, id, body);
-    if (!task) {
-        return c.json({ error: 'Task not found' }, 404);
+    try {
+        const workspacePath = c.req.query('path') || process.cwd();
+        const id = (0, validation_1.parseIntSafe)(c.req.param('id'), 'task ID');
+        const body = await c.req.json();
+        const task = db.updateTask(workspacePath, id, body);
+        if (!task) {
+            return c.json({ error: 'Task not found' }, 404);
+        }
+        return c.json(task);
     }
-    return c.json(task);
+    catch (error) {
+        if (error instanceof errors_1.PttaError) {
+            return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: (0, errors_1.getErrorMessage)(error) }, 500);
+    }
 });
 // サブタスク作成
 app.post('/api/subtasks', async (c) => {
@@ -143,14 +177,22 @@ app.post('/api/subtasks', async (c) => {
 });
 // サブタスク更新
 app.patch('/api/subtasks/:id', async (c) => {
-    const workspacePath = c.req.query('path') || process.cwd();
-    const id = parseInt(c.req.param('id'));
-    const body = await c.req.json();
-    const subtask = db.updateSubtask(workspacePath, id, body);
-    if (!subtask) {
-        return c.json({ error: 'Subtask not found' }, 404);
+    try {
+        const workspacePath = c.req.query('path') || process.cwd();
+        const id = (0, validation_1.parseIntSafe)(c.req.param('id'), 'subtask ID');
+        const body = await c.req.json();
+        const subtask = db.updateSubtask(workspacePath, id, body);
+        if (!subtask) {
+            return c.json({ error: 'Subtask not found' }, 404);
+        }
+        return c.json(subtask);
     }
-    return c.json(subtask);
+    catch (error) {
+        if (error instanceof errors_1.PttaError) {
+            return c.json({ error: error.message }, 400);
+        }
+        return c.json({ error: (0, errors_1.getErrorMessage)(error) }, 500);
+    }
 });
 // サマリー作成
 app.post('/api/summaries', async (c) => {
@@ -198,7 +240,7 @@ function startWebServer(port = 3737) {
         return app;
     }
     catch (error) {
-        console.error(`\n❌ Failed to start server:`, error.message);
+        console.error(`\n❌ Failed to start server:`, (0, errors_1.getErrorMessage)(error));
         process.exit(1);
     }
 }

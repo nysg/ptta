@@ -3,6 +3,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { PttaDatabase } from './database';
+import { PttaError, getErrorMessage } from './utils/errors';
+import { parseIntSafe } from './utils/validation';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -19,13 +21,26 @@ program
   .version(packageJson.version);
 
 // データベースインスタンスを作成して処理を実行するヘルパー
-function withDb(fn: (db: PttaDatabase, workspacePath: string, ...args: any[]) => void | Promise<void>) {
-  return async (...args: any[]) => {
-    const options = args[args.length - 1];
+function withDb<T extends unknown[]>(
+  fn: (db: PttaDatabase, workspacePath: string, ...args: T) => void | Promise<void>
+) {
+  return async (...args: T) => {
+    const options = args[args.length - 1] as { path?: string };
     const workspacePath = options.path || process.cwd();
     const db = new PttaDatabase();
     try {
       await fn(db, workspacePath, ...args);
+    } catch (error) {
+      // エラーメッセージを表示
+      if (error instanceof PttaError) {
+        console.error(chalk.red(`\n❌ Error: ${error.message}`));
+        if (error.code) {
+          console.error(chalk.gray(`Code: ${error.code}`));
+        }
+      } else {
+        console.error(chalk.red(`\n❌ Error: ${getErrorMessage(error)}`));
+      }
+      process.exit(1);
     } finally {
       db.close();
     }
@@ -89,7 +104,7 @@ program
   .argument('<id>', 'Project ID')
   .option('-j, --json', 'Output as JSON')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const hierarchy = db.getProjectHierarchy(workspacePath, parseInt(id));
+    const hierarchy = db.getProjectHierarchy(workspacePath, parseIntSafe(id, 'project ID'));
 
     if (!hierarchy) {
       console.log(chalk.red('Project not found'));
@@ -137,13 +152,13 @@ program
   .option('-d, --description <desc>', 'New description')
   .option('-P, --priority <priority>', 'New priority')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: any = {};
+    const updates: Partial<import('./database').Project> = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
     if (options.description) updates.description = options.description;
     if (options.priority) updates.priority = options.priority;
 
-    const project = db.updateProject(workspacePath, parseInt(id), updates);
+    const project = db.updateProject(workspacePath, parseIntSafe(id, 'project ID'), updates);
     console.log(chalk.green('✓ Project updated:'));
     console.log(JSON.stringify(project, null, 2));
   }));
@@ -159,7 +174,7 @@ program
   .action(withDb(async (db, workspacePath, projectId, title, options) => {
     const task = db.createTask(
       workspacePath,
-      parseInt(projectId),
+      parseIntSafe(projectId, 'project ID'),
       title,
       options.description,
       options.priority
@@ -176,7 +191,7 @@ program
   .option('-s, --status <status>', 'Filter by status')
   .option('-j, --json', 'Output as JSON')
   .action(withDb(async (db, workspacePath, options) => {
-    const projectId = options.project ? parseInt(options.project) : undefined;
+    const projectId = options.project ? parseIntSafe(options.project, 'project ID') : undefined;
     const tasks = db.listTasks(workspacePath, projectId, options.status);
 
     if (options.json) {
@@ -207,13 +222,13 @@ program
   .option('-d, --description <desc>', 'New description')
   .option('-P, --priority <priority>', 'New priority')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: any = {};
+    const updates: Partial<import('./database').Task> = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
     if (options.description) updates.description = options.description;
     if (options.priority) updates.priority = options.priority;
 
-    const task = db.updateTask(workspacePath, parseInt(id), updates);
+    const task = db.updateTask(workspacePath, parseIntSafe(id, 'task ID'), updates);
     console.log(chalk.green('✓ Task updated:'));
     console.log(JSON.stringify(task, null, 2));
   }));
@@ -225,7 +240,7 @@ program
   .argument('<taskId>', 'Task ID')
   .argument('<title>', 'Subtask title')
   .action(withDb(async (db, workspacePath, taskId, title) => {
-    const subtask = db.createSubtask(workspacePath, parseInt(taskId), title);
+    const subtask = db.createSubtask(workspacePath, parseIntSafe(taskId, 'task ID'), title);
     console.log(chalk.green('✓ Subtask created:'));
     console.log(JSON.stringify(subtask, null, 2));
   }));
@@ -236,7 +251,7 @@ program
   .description('Mark subtask as done')
   .argument('<id>', 'Subtask ID')
   .action(withDb(async (db, workspacePath, id) => {
-    const subtask = db.updateSubtask(workspacePath, parseInt(id), { status: 'done' });
+    const subtask = db.updateSubtask(workspacePath, parseIntSafe(id, 'subtask ID'), { status: 'done' });
     console.log(chalk.green('✓ Subtask completed:'));
     console.log(JSON.stringify(subtask, null, 2));
   }));
@@ -249,11 +264,11 @@ program
   .option('-s, --status <status>', 'New status (todo/done)')
   .option('-t, --title <title>', 'New title')
   .action(withDb(async (db, workspacePath, id, options) => {
-    const updates: any = {};
+    const updates: Partial<import('./database').Subtask> = {};
     if (options.status) updates.status = options.status;
     if (options.title) updates.title = options.title;
 
-    const subtask = db.updateSubtask(workspacePath, parseInt(id), updates);
+    const subtask = db.updateSubtask(workspacePath, parseIntSafe(id, 'subtask ID'), updates);
     console.log(chalk.green('✓ Subtask updated:'));
     console.log(JSON.stringify(subtask, null, 2));
   }));
@@ -266,7 +281,7 @@ program
   .argument('<id>', 'Entity ID')
   .argument('<summary>', 'Summary text')
   .action(withDb(async (db, workspacePath, type, id, summary) => {
-    const summaryId = db.createSummary(workspacePath, type, parseInt(id), summary);
+    const summaryId = db.createSummary(workspacePath, type, parseIntSafe(id, 'entity ID'), summary);
     console.log(chalk.green(`✓ Summary added (ID: ${summaryId})`));
   }));
 
@@ -277,7 +292,7 @@ program
   .option('-P, --project <id>', 'Export specific project')
   .option('-o, --output <file>', 'Output file path')
   .action(withDb(async (db, workspacePath, options) => {
-    const projectId = options.project ? parseInt(options.project) : undefined;
+    const projectId = options.project ? parseIntSafe(options.project, 'project ID') : undefined;
     const data = db.exportAsJson(workspacePath, projectId);
 
     const jsonData = JSON.stringify(data, null, 2);
@@ -330,7 +345,7 @@ program
   .option('-i, --id <id>', 'Specific ID')
   .option('-s, --status <status>', 'Filter by status')
   .action(withDb(async (db, workspacePath, type, options) => {
-    let result: any;
+    let result: unknown;
 
     switch (type) {
       case 'projects':
@@ -339,7 +354,7 @@ program
       case 'tasks':
         result = db.listTasks(
           workspacePath,
-          options.id ? parseInt(options.id) : undefined,
+          options.id ? parseIntSafe(options.id, 'ID') : undefined,
           options.status
         );
         break;
@@ -348,7 +363,7 @@ program
           console.error('Error: --id required for hierarchy query');
           process.exit(1);
         }
-        result = db.getProjectHierarchy(workspacePath, parseInt(options.id));
+        result = db.getProjectHierarchy(workspacePath, parseIntSafe(options.id, 'project ID'));
         break;
       case 'all':
         result = db.exportAsJson(workspacePath);
@@ -401,7 +416,7 @@ program
   .option('--port <port>', 'Server port', '3737')
   .action(async (options) => {
     const { startWebServer } = await import('./web');
-    const port = parseInt(options.port);
+    const port = parseIntSafe(options.port, 'port');
     startWebServer(port);
   });
 

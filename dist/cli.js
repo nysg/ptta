@@ -40,6 +40,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const commander_1 = require("commander");
 const chalk_1 = __importDefault(require("chalk"));
 const database_1 = require("./database");
+const errors_1 = require("./utils/errors");
+const validation_1 = require("./utils/validation");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 // package.jsonからバージョンを読み込む
@@ -57,6 +59,19 @@ function withDb(fn) {
         const db = new database_1.PttaDatabase();
         try {
             await fn(db, workspacePath, ...args);
+        }
+        catch (error) {
+            // エラーメッセージを表示
+            if (error instanceof errors_1.PttaError) {
+                console.error(chalk_1.default.red(`\n❌ Error: ${error.message}`));
+                if (error.code) {
+                    console.error(chalk_1.default.gray(`Code: ${error.code}`));
+                }
+            }
+            else {
+                console.error(chalk_1.default.red(`\n❌ Error: ${(0, errors_1.getErrorMessage)(error)}`));
+            }
+            process.exit(1);
         }
         finally {
             db.close();
@@ -110,7 +125,7 @@ program
     .argument('<id>', 'Project ID')
     .option('-j, --json', 'Output as JSON')
     .action(withDb(async (db, workspacePath, id, options) => {
-    const hierarchy = db.getProjectHierarchy(workspacePath, parseInt(id));
+    const hierarchy = db.getProjectHierarchy(workspacePath, (0, validation_1.parseIntSafe)(id, 'project ID'));
     if (!hierarchy) {
         console.log(chalk_1.default.red('Project not found'));
         return;
@@ -160,7 +175,7 @@ program
         updates.description = options.description;
     if (options.priority)
         updates.priority = options.priority;
-    const project = db.updateProject(workspacePath, parseInt(id), updates);
+    const project = db.updateProject(workspacePath, (0, validation_1.parseIntSafe)(id, 'project ID'), updates);
     console.log(chalk_1.default.green('✓ Project updated:'));
     console.log(JSON.stringify(project, null, 2));
 }));
@@ -173,7 +188,7 @@ program
     .option('-d, --description <desc>', 'Task description')
     .option('-P, --priority <priority>', 'Priority (low/medium/high)', 'medium')
     .action(withDb(async (db, workspacePath, projectId, title, options) => {
-    const task = db.createTask(workspacePath, parseInt(projectId), title, options.description, options.priority);
+    const task = db.createTask(workspacePath, (0, validation_1.parseIntSafe)(projectId, 'project ID'), title, options.description, options.priority);
     console.log(chalk_1.default.green('✓ Task created:'));
     console.log(JSON.stringify(task, null, 2));
 }));
@@ -185,7 +200,7 @@ program
     .option('-s, --status <status>', 'Filter by status')
     .option('-j, --json', 'Output as JSON')
     .action(withDb(async (db, workspacePath, options) => {
-    const projectId = options.project ? parseInt(options.project) : undefined;
+    const projectId = options.project ? (0, validation_1.parseIntSafe)(options.project, 'project ID') : undefined;
     const tasks = db.listTasks(workspacePath, projectId, options.status);
     if (options.json) {
         console.log(JSON.stringify(tasks, null, 2));
@@ -222,7 +237,7 @@ program
         updates.description = options.description;
     if (options.priority)
         updates.priority = options.priority;
-    const task = db.updateTask(workspacePath, parseInt(id), updates);
+    const task = db.updateTask(workspacePath, (0, validation_1.parseIntSafe)(id, 'task ID'), updates);
     console.log(chalk_1.default.green('✓ Task updated:'));
     console.log(JSON.stringify(task, null, 2));
 }));
@@ -233,7 +248,7 @@ program
     .argument('<taskId>', 'Task ID')
     .argument('<title>', 'Subtask title')
     .action(withDb(async (db, workspacePath, taskId, title) => {
-    const subtask = db.createSubtask(workspacePath, parseInt(taskId), title);
+    const subtask = db.createSubtask(workspacePath, (0, validation_1.parseIntSafe)(taskId, 'task ID'), title);
     console.log(chalk_1.default.green('✓ Subtask created:'));
     console.log(JSON.stringify(subtask, null, 2));
 }));
@@ -243,7 +258,7 @@ program
     .description('Mark subtask as done')
     .argument('<id>', 'Subtask ID')
     .action(withDb(async (db, workspacePath, id) => {
-    const subtask = db.updateSubtask(workspacePath, parseInt(id), { status: 'done' });
+    const subtask = db.updateSubtask(workspacePath, (0, validation_1.parseIntSafe)(id, 'subtask ID'), { status: 'done' });
     console.log(chalk_1.default.green('✓ Subtask completed:'));
     console.log(JSON.stringify(subtask, null, 2));
 }));
@@ -260,7 +275,7 @@ program
         updates.status = options.status;
     if (options.title)
         updates.title = options.title;
-    const subtask = db.updateSubtask(workspacePath, parseInt(id), updates);
+    const subtask = db.updateSubtask(workspacePath, (0, validation_1.parseIntSafe)(id, 'subtask ID'), updates);
     console.log(chalk_1.default.green('✓ Subtask updated:'));
     console.log(JSON.stringify(subtask, null, 2));
 }));
@@ -272,7 +287,7 @@ program
     .argument('<id>', 'Entity ID')
     .argument('<summary>', 'Summary text')
     .action(withDb(async (db, workspacePath, type, id, summary) => {
-    const summaryId = db.createSummary(workspacePath, type, parseInt(id), summary);
+    const summaryId = db.createSummary(workspacePath, type, (0, validation_1.parseIntSafe)(id, 'entity ID'), summary);
     console.log(chalk_1.default.green(`✓ Summary added (ID: ${summaryId})`));
 }));
 // エクスポート
@@ -282,7 +297,7 @@ program
     .option('-P, --project <id>', 'Export specific project')
     .option('-o, --output <file>', 'Output file path')
     .action(withDb(async (db, workspacePath, options) => {
-    const projectId = options.project ? parseInt(options.project) : undefined;
+    const projectId = options.project ? (0, validation_1.parseIntSafe)(options.project, 'project ID') : undefined;
     const data = db.exportAsJson(workspacePath, projectId);
     const jsonData = JSON.stringify(data, null, 2);
     if (options.output) {
@@ -333,14 +348,14 @@ program
             result = db.listProjects(workspacePath, options.status);
             break;
         case 'tasks':
-            result = db.listTasks(workspacePath, options.id ? parseInt(options.id) : undefined, options.status);
+            result = db.listTasks(workspacePath, options.id ? (0, validation_1.parseIntSafe)(options.id, 'ID') : undefined, options.status);
             break;
         case 'hierarchy':
             if (!options.id) {
                 console.error('Error: --id required for hierarchy query');
                 process.exit(1);
             }
-            result = db.getProjectHierarchy(workspacePath, parseInt(options.id));
+            result = db.getProjectHierarchy(workspacePath, (0, validation_1.parseIntSafe)(options.id, 'project ID'));
             break;
         case 'all':
             result = db.exportAsJson(workspacePath);
@@ -388,7 +403,7 @@ program
     .option('--port <port>', 'Server port', '3737')
     .action(async (options) => {
     const { startWebServer } = await Promise.resolve().then(() => __importStar(require('./web')));
-    const port = parseInt(options.port);
+    const port = (0, validation_1.parseIntSafe)(options.port, 'port');
     startWebServer(port);
 });
 program.parse();

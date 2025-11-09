@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { PttaDatabase } from './database';
+import { PttaError, getErrorMessage } from './utils/errors';
+import { parseIntSafe } from './utils/validation';
 import * as path from 'path';
 
 const app = new Hono();
@@ -43,15 +45,22 @@ app.get('/api/projects', (c) => {
 
 // プロジェクト詳細（階層）
 app.get('/api/projects/:id', (c) => {
-  const workspacePath = c.req.query('path') || process.cwd();
-  const id = parseInt(c.req.param('id'));
-  const hierarchy = db.getProjectHierarchy(workspacePath, id);
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const id = parseIntSafe(c.req.param('id'), 'project ID');
+    const hierarchy = db.getProjectHierarchy(workspacePath, id);
 
-  if (!hierarchy) {
-    return c.json({ error: 'Project not found' }, 404);
+    if (!hierarchy) {
+      return c.json({ error: 'Project not found' }, 404);
+    }
+
+    return c.json(hierarchy);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
   }
-
-  return c.json(hierarchy);
 });
 
 // プロジェクト作成
@@ -70,27 +79,41 @@ app.post('/api/projects', async (c) => {
 
 // プロジェクト更新
 app.patch('/api/projects/:id', async (c) => {
-  const workspacePath = c.req.query('path') || process.cwd();
-  const id = parseInt(c.req.param('id'));
-  const body = await c.req.json();
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const id = parseIntSafe(c.req.param('id'), 'project ID');
+    const body = await c.req.json();
 
-  const project = db.updateProject(workspacePath, id, body);
+    const project = db.updateProject(workspacePath, id, body);
 
-  if (!project) {
-    return c.json({ error: 'Project not found' }, 404);
+    if (!project) {
+      return c.json({ error: 'Project not found' }, 404);
+    }
+
+    return c.json(project);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
   }
-
-  return c.json(project);
 });
 
 // タスク一覧
 app.get('/api/tasks', (c) => {
-  const workspacePath = c.req.query('path') || process.cwd();
-  const projectId = c.req.query('projectId') ? parseInt(c.req.query('projectId')!) : undefined;
-  const status = c.req.query('status');
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const projectId = c.req.query('projectId') ? parseIntSafe(c.req.query('projectId')!, 'project ID') : undefined;
+    const status = c.req.query('status');
 
-  const tasks = db.listTasks(workspacePath, projectId, status);
-  return c.json(tasks);
+    const tasks = db.listTasks(workspacePath, projectId, status);
+    return c.json(tasks);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
+  }
 });
 
 // タスク作成
@@ -109,17 +132,24 @@ app.post('/api/tasks', async (c) => {
 
 // タスク更新
 app.patch('/api/tasks/:id', async (c) => {
-  const workspacePath = c.req.query('path') || process.cwd();
-  const id = parseInt(c.req.param('id'));
-  const body = await c.req.json();
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const id = parseIntSafe(c.req.param('id'), 'task ID');
+    const body = await c.req.json();
 
-  const task = db.updateTask(workspacePath, id, body);
+    const task = db.updateTask(workspacePath, id, body);
 
-  if (!task) {
-    return c.json({ error: 'Task not found' }, 404);
+    if (!task) {
+      return c.json({ error: 'Task not found' }, 404);
+    }
+
+    return c.json(task);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
   }
-
-  return c.json(task);
 });
 
 // サブタスク作成
@@ -138,17 +168,24 @@ app.post('/api/subtasks', async (c) => {
 
 // サブタスク更新
 app.patch('/api/subtasks/:id', async (c) => {
-  const workspacePath = c.req.query('path') || process.cwd();
-  const id = parseInt(c.req.param('id'));
-  const body = await c.req.json();
+  try {
+    const workspacePath = c.req.query('path') || process.cwd();
+    const id = parseIntSafe(c.req.param('id'), 'subtask ID');
+    const body = await c.req.json();
 
-  const subtask = db.updateSubtask(workspacePath, id, body);
+    const subtask = db.updateSubtask(workspacePath, id, body);
 
-  if (!subtask) {
-    return c.json({ error: 'Subtask not found' }, 404);
+    if (!subtask) {
+      return c.json({ error: 'Subtask not found' }, 404);
+    }
+
+    return c.json(subtask);
+  } catch (error) {
+    if (error instanceof PttaError) {
+      return c.json({ error: error.message }, 400);
+    }
+    return c.json({ error: getErrorMessage(error) }, 500);
   }
-
-  return c.json(subtask);
 });
 
 // サマリー作成
@@ -203,8 +240,8 @@ export function startWebServer(port: number = 3737) {
     });
 
     return app;
-  } catch (error: any) {
-    console.error(`\n❌ Failed to start server:`, error.message);
+  } catch (error) {
+    console.error(`\n❌ Failed to start server:`, getErrorMessage(error));
     process.exit(1);
   }
 }
