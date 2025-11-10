@@ -93,15 +93,7 @@ print_success "Version updated to: $NEW_VERSION"
 echo ""
 print_info "Changes:"
 git diff package.json
-
 echo ""
-read -p "Proceed with deployment of version $NEW_VERSION? (y/N) " -n 1 -r
-echo ""
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    print_info "Deployment cancelled. Reverting version change..."
-    git checkout package.json
-    exit 0
-fi
 
 # Commit version change
 print_info "Committing version change..."
