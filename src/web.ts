@@ -6,6 +6,7 @@ import { PttaError, getErrorMessage } from './utils/errors';
 import { parseIntSafe } from './utils/validation';
 import { createLogger } from './utils/logger';
 import * as path from 'path';
+import * as fs from 'fs';
 
 const app = new Hono();
 const logger = createLogger({ module: 'WebServer' });
@@ -216,8 +217,17 @@ app.get('/api/stats', (c) => {
 const baseDir = path.join(__dirname, '..');
 const webClientDist = path.join(baseDir, 'web/client/dist');
 
+// 静的アセットの配信
 app.use('/assets/*', serveStatic({ root: webClientDist }));
-app.get('/', serveStatic({ path: path.join(webClientDist, 'index.html') }));
+app.use('/favicon.svg', serveStatic({ root: webClientDist }));
+
+// SPAフォールバック: すべてのHTML要求にindex.htmlを返す
+// これによりReact Routerのクライアントサイドルーティングが正しく動作
+app.get('*', (c) => {
+  const indexPath = path.join(webClientDist, 'index.html');
+  const html = fs.readFileSync(indexPath, 'utf-8');
+  return c.html(html);
+});
 
 // サーバー起動関数
 export function startWebServer(port: number = 3737) {
