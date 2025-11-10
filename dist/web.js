@@ -42,6 +42,7 @@ const errors_1 = require("./utils/errors");
 const validation_1 = require("./utils/validation");
 const logger_1 = require("./utils/logger");
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const app = new hono_1.Hono();
 const logger = (0, logger_1.createLogger)({ module: 'WebServer' });
 // データベースインスタンス
@@ -217,8 +218,16 @@ app.get('/api/stats', (c) => {
 // グローバルインストール対応: 絶対パスで解決
 const baseDir = path.join(__dirname, '..');
 const webClientDist = path.join(baseDir, 'web/client/dist');
+// 静的アセットの配信
 app.use('/assets/*', (0, serve_static_1.serveStatic)({ root: webClientDist }));
-app.get('/', (0, serve_static_1.serveStatic)({ path: path.join(webClientDist, 'index.html') }));
+app.use('/favicon.svg', (0, serve_static_1.serveStatic)({ root: webClientDist }));
+// SPAフォールバック: すべてのHTML要求にindex.htmlを返す
+// これによりReact Routerのクライアントサイドルーティングが正しく動作
+app.get('*', (c) => {
+    const indexPath = path.join(webClientDist, 'index.html');
+    const html = fs.readFileSync(indexPath, 'utf-8');
+    return c.html(html);
+});
 // サーバー起動関数
 function startWebServer(port = 3737) {
     logger.info({ port }, 'Starting WebUI server');
