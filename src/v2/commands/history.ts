@@ -15,13 +15,19 @@ export function registerHistoryCommands(program: Command): void {
     .option('-s, --session <id>', 'Session ID (default: current active session)')
     .option('-w, --workspace <path>', 'Workspace path (default: current directory)')
     .option('-t, --type <type>', 'Filter by event type')
-    .option('-l, --limit <number>', 'Limit number of events', parseInt, 50)
+    .option('-l, --limit <number>', 'Limit number of events (default: 50)')
     .option('--json', 'Output as JSON')
     .action(async (options) => {
       const db = getDb();
 
-      // Ensure limit is a number
-      const limit = typeof options.limit === 'number' ? options.limit : parseInt(options.limit || '50', 10);
+      // Parse limit - ensure it's a valid number
+      let limit = 50; // default
+      if (options.limit !== undefined) {
+        const parsed = parseInt(String(options.limit), 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          limit = parsed;
+        }
+      }
 
       let events;
 
