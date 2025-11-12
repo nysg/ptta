@@ -113,40 +113,15 @@ class PttaDatabase {
     }
     createFTS() {
         // FTS5 virtual table for full-text search
-        // TODO: Re-enable after fixing trigger issues
-        // this.db.exec(`
-        //   CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
-        //     event_id UNINDEXED,
-        //     session_id UNINDEXED,
-        //     type UNINDEXED,
-        //     content,
-        //     tokenize = 'unicode61'
-        //   )
-        // `);
+        // Disabled due to compatibility issues
+        // TODO: Re-enable and fix FTS5 implementation
     }
     createTriggers() {
-        // Auto-update FTS5 table when events are inserted
-        // Note: Triggers are disabled temporarily for debugging
-        // this.db.exec(`
-        //   CREATE TRIGGER IF NOT EXISTS events_fts_insert AFTER INSERT ON events BEGIN
-        //     INSERT INTO events_fts(event_id, session_id, type, content)
-        //     VALUES (
-        //       new.id,
-        //       new.session_id,
-        //       new.type,
-        //       IFNULL(json_extract(new.data, '$.content'), '') || ' ' ||
-        //       IFNULL(json_extract(new.data, '$.reason'), '') || ' ' ||
-        //       IFNULL(json_extract(new.data, '$.file_path'), '') || ' ' ||
-        //       IFNULL(json_extract(new.data, '$.context'), '')
-        //     );
-        //   END;
-        // `);
-        // // Delete from FTS5 when event is deleted
-        // this.db.exec(`
-        //   CREATE TRIGGER IF NOT EXISTS events_fts_delete AFTER DELETE ON events BEGIN
-        //     DELETE FROM events_fts WHERE event_id = old.id;
-        //   END;
-        // `);
+        // No triggers needed
+    }
+    updateFTS(eventId, sessionId, type, data) {
+        // FTS5 disabled for now
+        // TODO: Re-enable and fix FTS5 implementation
     }
     // ============================================================================
     // Session Operations
@@ -267,6 +242,8 @@ class PttaDatabase {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
         stmt.run(id, input.session_id, next_seq, now, input.type, JSON.stringify(input.data), input.parent_event_id || null);
+        // Update FTS5 index
+        this.updateFTS(id, input.session_id, input.type, input.data);
         return {
             id,
             session_id: input.session_id,

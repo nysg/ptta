@@ -21,14 +21,16 @@ function registerHistoryCommands(program) {
         .option('--json', 'Output as JSON')
         .action(async (options) => {
         const db = (0, cli_js_1.getDb)();
+        // Ensure limit is a number
+        const limit = typeof options.limit === 'number' ? options.limit : parseInt(options.limit || '50', 10);
         let events;
         if (options.session) {
             // Show events from specific session
-            events = db.listEvents(options.session, options.type, options.limit);
+            events = db.listEvents(options.session, options.type, limit);
         }
         else {
             // Show recent events
-            events = db.getRecentEvents(options.limit, options.type);
+            events = db.getRecentEvents(limit, options.type);
         }
         if (options.json) {
             console.log(JSON.stringify(events, null, 2));

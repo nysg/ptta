@@ -20,14 +20,17 @@ export function registerHistoryCommands(program: Command): void {
     .action(async (options) => {
       const db = getDb();
 
+      // Ensure limit is a number
+      const limit = typeof options.limit === 'number' ? options.limit : parseInt(options.limit || '50', 10);
+
       let events;
 
       if (options.session) {
         // Show events from specific session
-        events = db.listEvents(options.session, options.type as EventType, options.limit);
+        events = db.listEvents(options.session, options.type as EventType, limit);
       } else {
         // Show recent events
-        events = db.getRecentEvents(options.limit, options.type as EventType);
+        events = db.getRecentEvents(limit, options.type as EventType);
       }
 
       if (options.json) {

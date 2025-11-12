@@ -14,6 +14,7 @@ export declare class PttaDatabase {
     private createIndices;
     private createFTS;
     private createTriggers;
+    private updateFTS;
     createSession(input: CreateSessionInput): Session;
     getSession(id: string): Session | null;
     listSessions(workspacePath?: string, activeOnly?: boolean): SessionWithStats[];
