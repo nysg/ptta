@@ -101,17 +101,44 @@ export class PttaDatabase {
 
   private createFTS(): void {
     // FTS5 virtual table for full-text search
-    // Disabled due to compatibility issues
-    // TODO: Re-enable and fix FTS5 implementation
+    // Using trigram tokenizer for better multilingual support (including Japanese)
+    this.db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
+        event_id UNINDEXED,
+        session_id UNINDEXED,
+        type UNINDEXED,
+        content,
+        tokenize = 'trigram case_sensitive 0'
+      )
+    `);
   }
 
   private createTriggers(): void {
-    // No triggers needed
+    // No triggers - FTS5 is updated manually in createEvent
   }
 
   private updateFTS(eventId: string, sessionId: string, type: string, data: EventData): void {
-    // FTS5 disabled for now
-    // TODO: Re-enable and fix FTS5 implementation
+    // Extract searchable content from event data
+    const parts: string[] = [];
+
+    const d = data as any;
+    if (d.content) parts.push(d.content);
+    if (d.reason) parts.push(d.reason);
+    if (d.file_path) parts.push(d.file_path);
+    if (d.context) parts.push(d.context);
+    if (d.tool) parts.push(d.tool);
+
+    const content = parts.join(' ').trim();
+
+    // Only insert if there's content to search
+    if (content.length > 0) {
+      const stmt = this.db.prepare(`
+        INSERT INTO events_fts(event_id, session_id, type, content)
+        VALUES (?, ?, ?, ?)
+      `);
+
+      stmt.run(eventId, sessionId, type, content);
+    }
   }
 
   // ============================================================================
@@ -404,10 +431,11 @@ export class PttaDatabase {
   // ============================================================================
 
   searchEvents(query: string, sessionId?: string, type?: EventType): EventSearchResult[] {
+    // Try FTS5 search first
     let sql = `
       SELECT
         e.id, e.session_id, e.sequence, e.timestamp, e.type, e.data, e.parent_event_id,
-        s.id as s_id, s.workspace_path, s.started_at, s.ended_at, s.metadata,
+        s.id as s_id, s.workspace_path, s.started_at, s.ended_at, s.metadata, s.created_at,
         fts.rank
       FROM events_fts fts
       JOIN events e ON fts.event_id = e.id
@@ -415,7 +443,7 @@ export class PttaDatabase {
       WHERE events_fts MATCH ?
     `;
 
-    const params: any[] = [query];
+    let params: any[] = [query];
 
     if (sessionId) {
       sql += ' AND fts.session_id = ?';
@@ -429,10 +457,59 @@ export class PttaDatabase {
 
     sql += ' ORDER BY fts.rank LIMIT 100';
 
-    const stmt = this.db.prepare(sql);
-    const rows = stmt.all(...params) as any[];
+    try {
+      const stmt = this.db.prepare(sql);
+      const rows = stmt.all(...params) as any[];
 
-    return rows.map((row) => ({
+      // If FTS5 returns results, use them
+      if (rows.length > 0) {
+        return rows.map((row) => ({
+          ...this.parseEventRow(row),
+          session: this.parseSessionRow({
+            id: row.s_id,
+            workspace_path: row.workspace_path,
+            started_at: row.started_at,
+            ended_at: row.ended_at,
+            metadata: row.metadata,
+            created_at: row.created_at,
+          }),
+          rank: row.rank,
+        }));
+      }
+    } catch (error) {
+      // FTS5 search failed, fall through to LIKE search
+    }
+
+    // Fallback to LIKE search for better multilingual support (especially Japanese)
+    let likeSql = `
+      SELECT
+        e.id, e.session_id, e.sequence, e.timestamp, e.type, e.data, e.parent_event_id,
+        s.id as s_id, s.workspace_path, s.started_at, s.ended_at, s.metadata, s.created_at,
+        0 as rank
+      FROM events_fts fts
+      JOIN events e ON fts.event_id = e.id
+      JOIN sessions s ON e.session_id = s.id
+      WHERE fts.content LIKE ?
+    `;
+
+    params = [`%${query}%`];
+
+    if (sessionId) {
+      likeSql += ' AND fts.session_id = ?';
+      params.push(sessionId);
+    }
+
+    if (type) {
+      likeSql += ' AND fts.type = ?';
+      params.push(type);
+    }
+
+    likeSql += ' ORDER BY e.timestamp DESC LIMIT 100';
+
+    const likeStmt = this.db.prepare(likeSql);
+    const likeRows = likeStmt.all(...params) as any[];
+
+    return likeRows.map((row) => ({
       ...this.parseEventRow(row),
       session: this.parseSessionRow({
         id: row.s_id,
