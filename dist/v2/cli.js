@@ -21,6 +21,7 @@ const search_js_1 = require("./commands/search.js");
 const file_js_1 = require("./commands/file.js");
 const stats_js_1 = require("./commands/stats.js");
 const export_js_1 = require("./commands/export.js");
+const web_js_1 = require("./commands/web.js");
 const program = new commander_1.Command();
 program
     .name('ptta')
@@ -48,6 +49,7 @@ function closeDb() {
 (0, file_js_1.registerFileCommands)(program);
 (0, stats_js_1.registerStatsCommand)(program);
 (0, export_js_1.registerExportCommands)(program);
+(0, web_js_1.registerWebCommand)(program);
 // Error handling
 program.exitOverride();
 async function main() {

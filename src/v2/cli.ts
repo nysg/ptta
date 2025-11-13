@@ -18,6 +18,7 @@ import { registerSearchCommands } from './commands/search.js';
 import { registerFileCommands } from './commands/file.js';
 import { registerStatsCommand } from './commands/stats.js';
 import { registerExportCommands } from './commands/export.js';
+import { registerWebCommand } from './commands/web.js';
 
 const program = new Command();
 
@@ -51,6 +52,7 @@ registerSearchCommands(program);
 registerFileCommands(program);
 registerStatsCommand(program);
 registerExportCommands(program);
+registerWebCommand(program);
 
 // Error handling
 program.exitOverride();
