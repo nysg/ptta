@@ -1,25 +1,33 @@
-# ptta (Project, Task, Todo, Action)
+# ptta v2.0 - AI External Memory
 
-AI-first Task Management CLI - External Memory for Claude Code
+**AIのための外部記憶装置 (External Memory for AI)**
 
-**Current Implementation**: Workspace → Task → Todo → Action hierarchy (4 layers)
+pttaは、Claude CodeなどのAIアシスタントがセッション間で**会話・思考・コード変更履歴**を永続化するための、AIファーストな外部記憶システムです。
 
-## Features
+## 🎯 コンセプト
 
-- 📋 **Hierarchical Task Management**: Workspace → Task → Todo → Action
-- 🤖 **AI-Optimized**: Structured JSON data, designed for easy Claude Code integration
-- 💾 **Persistent Storage**: Fast data management with better-sqlite3
-- 📁 **Workspace-based**: Independent task management per workspace path
-- 🔍 **Efficient Queries**: Save Claude Code's context window
-- 🌐 **Web Interface**: Visual task management via WebUI
+従来の「タスク管理ツール」から「**AIのための外部記憶装置**」へ。
 
-## Installation
+- **コンテキストウィンドウ節約**: セッション間で完全な履歴を保存・参照
+- **完全な履歴保存**: 要約ではなく、実際の会話、思考プロセス、コード編集を保存
+- **AIファースト設計**: AIが読み取りやすく、書き込みやすいデータ構造
+
+## ⚡ 特徴
+
+- 🎬 **イベントストリーム型**: すべての活動を時系列のイベントとして記録
+- 💭 **思考プロセス記録**: Claudeの思考内容（thinkingブロック）を保存
+- 📝 **Intent → Edit フロー**: コード変更の意図を先に記録してから実際の編集を実行
+- 🔍 **FTS5全文検索**: 日本語・英語対応の高速検索
+- 🌐 **WebUI**: セッションのタイムライン表示、イベント検索
+- 💾 **SQLite**: 高速で信頼性の高いローカルストレージ
+
+## 📦 インストール
 
 ```bash
 npm install -g @nysg/ptta
 ```
 
-### Local Development
+### ローカル開発
 
 ```bash
 npm install
@@ -27,203 +35,234 @@ npm run build
 npm link
 ```
 
-## WebUI
+## 🚀 基本的な使い方
 
-Launch the web interface to manage your tasks visually.
+### 1. セッション管理
 
 ```bash
-# Start WebUI (default port: 3737)
+# セッション開始
+ptta session:start
+
+# 現在のセッション確認
+ptta session:current
+
+# セッション一覧
+ptta session:list
+
+# セッション終了
+ptta session:end
+
+# セッション詳細表示
+ptta session:show <session_id>
+```
+
+### 2. イベント記録
+
+```bash
+# ユーザーメッセージを記録
+ptta log:user "認証機能を追加してください"
+
+# Claudeの返答を記録
+ptta log:assistant "JWT認証を実装します"
+
+# 思考プロセスを記録
+ptta log:thinking "認証にはJWTを使用し、middlewareで検証する設計が適切" --context "authentication"
+
+# コード変更の意図を記録（編集前）
+ptta log:intention src/auth.ts --reason "JWT検証ミドルウェアを追加"
+
+# ファイル編集結果を記録（編集後）
+ptta log:edit src/auth.ts --action edit
+
+# ツール使用を記録
+ptta log:tool "Read" --params '{"file_path": "src/auth.ts"}'
+```
+
+### 3. 履歴表示・検索
+
+```bash
+# イベント履歴表示（タイムライン）
+ptta history
+
+# 最新50件を表示
+ptta history --limit 50
+
+# 特定タイプのイベントのみ
+ptta history --type user_message
+
+# 全文検索
+ptta search "認証"
+ptta search "JWT"
+
+# ファイルの変更履歴
+ptta file:history src/auth.ts
+```
+
+### 4. 統計情報・エクスポート
+
+```bash
+# 統計情報表示
+ptta stats
+
+# JSON形式でエクスポート
+ptta export
+
+# 特定ファイルの履歴をエクスポート
+ptta export:file src/auth.ts
+```
+
+### 5. WebUI
+
+```bash
+# WebUI起動（デフォルト: ポート3737）
 ptta web
 
-# Custom port
+# カスタムポート
 ptta web --port 8080
 ```
 
-Open <http://localhost:3737> in your browser.
+ブラウザで http://localhost:3737 を開くと、以下の機能が利用できます：
 
-## Basic Usage
+- **セッション一覧**: すべてのセッションを表示、統計情報
+- **セッション詳細**: タイムライン形式でイベントを表示
+- **検索**: 全文検索でイベントを検索
 
-### Task Management
+## 📊 データモデル
 
-```bash
-# Create task
-ptta task:add "Web App Development" -d "New web application project" -P high
+### イベントストリーム型
 
-# List tasks
-ptta task:list
-
-# Show task details (hierarchical view with todos and actions)
-ptta task:show 1
-
-# Update task status
-ptta task:update 1 -s completed
+```
+Session (セッション = Claude Codeの1セッション)
+  └── Event (イベント = 時系列の出来事)
+      ├── user_message (ユーザーの発言)
+      ├── assistant_message (Claudeの返答)
+      ├── thinking (Claudeの思考)
+      ├── code_intention (コード変更の意図) ← 編集前
+      ├── file_edit (実際のファイル編集) ← 編集後
+      └── tool_use (ツール使用ログ)
 ```
 
-### Todo Management
+### 6つのイベントタイプ
+
+1. **user_message**: ユーザーからの指示・質問
+2. **assistant_message**: Claudeの返答
+3. **thinking**: Claudeの思考プロセス（thinkingブロック）
+4. **code_intention**: コード変更の意図（変更前に記録）
+5. **file_edit**: 実際のファイル編集結果
+6. **tool_use**: ツールの使用記録
+
+## 🤖 Claude Code との統合
+
+### セッション開始時の推奨フロー
 
 ```bash
-# Create todo for task 1
-ptta todo:add 1 "Implement authentication" -d "Implement JWT authentication" -P high
+# 1. セッション開始
+ptta session:start
 
-# List all todos
-ptta todo:list
+# 2. 前回のセッションを確認
+ptta session:list --limit 5
 
-# List todos for task 1
-ptta todo:list -T 1
+# 3. 特定ファイルの履歴を確認
+ptta file:history src/index.ts
 
-# Update todo status
-ptta todo:update 1 -s in_progress
-
-# Complete todo
-ptta todo:update 1 -s done
+# 4. 最近のイベントを確認
+ptta history --limit 20
 ```
 
-### Action Management
+### コード編集時の推奨フロー
 
 ```bash
-# Add actions to todo 1
-ptta action:add 1 "Create login UI"
-ptta action:add 1 "Implement JWT generation logic"
+# STEP 1: 編集の意図を記録
+ptta log:intention src/auth.ts --reason "JWT検証ミドルウェアを追加してセキュリティを強化"
 
-# Complete action
-ptta action:done 1
+# STEP 2: 実際にファイルを編集（Claude CodeのEditツールなど）
+# ... ファイル編集 ...
 
-# Update action
-ptta action:update 1 -s done
+# STEP 3: 編集結果を記録
+ptta log:edit src/auth.ts --action edit
 ```
 
-### Workspace Management
+### セッション終了時
 
 ```bash
-# List workspaces
-ptta workspace:list
+# セッション終了
+ptta session:end
 
-# Execute in specific workspace
-ptta -p /path/to/project task:list
+# エクスポート（必要に応じて）
+ptta export --output session_summary.json
 ```
 
-### Data Export
-
-```bash
-# Export all data as JSON
-ptta export
-
-# Export specific task to file
-ptta export -T 1 -o task1.json
-
-# Show statistics
-ptta stats
-```
-
-## Claude Code Integration
-
-### 1. Check current todos at work start
-
-```bash
-# Get in-progress todos in JSON format
-ptta query todos -s in_progress
-```
-
-### 2. Understand task overview
-
-```bash
-# Get task hierarchy (with todos and actions) in JSON format
-ptta query hierarchy -i 1
-```
-
-### 3. Record work completion
-
-```bash
-# Complete todo and add summary
-ptta todo:update 5 -s done
-ptta summary:add todo 5 "API integration completed. Implemented error handling and rate limiting."
-```
-
-### 4. AI Query Commands (JSON format)
-
-```bash
-# All tasks
-ptta query tasks
-
-# All todos
-ptta query todos
-
-# Specific task hierarchy (includes all todos and actions)
-ptta query hierarchy -i 1
-
-# All data
-ptta query all
-
-# Statistics
-ptta query stats
-
-# Workspace list
-ptta query workspaces
-```
-
-## Data Storage Location
+## 💾 データ保存場所
 
 ```
 ~/.ptta/ptta.db
 ```
 
-## Status Values
+すべてのセッションとイベントが単一のSQLiteデータベースに保存されます。
 
-### Tasks
+## 🔧 技術スタック
 
-- `active`: Active (in progress)
-- `completed`: Completed
-- `archived`: Archived
+### バックエンド
+- **言語**: TypeScript
+- **ランタイム**: Node.js
+- **データベース**: SQLite (better-sqlite3)
+- **CLIフレームワーク**: Commander.js
+- **WebAPI**: Hono
+- **全文検索**: FTS5 (SQLite)
 
-### Todos/Actions
+### フロントエンド（WebUI）
+- **フレームワーク**: React 19
+- **ルーティング**: React Router v7
+- **状態管理**: TanStack React Query
+- **スタイリング**: Tailwind CSS
+- **UIコンポーネント**: shadcn/ui
+- **ビルドツール**: Vite
 
-- `todo`: Not started
-- `in_progress`: In progress
-- `done`: Completed
+## 📚 詳細ドキュメント
 
-## Priority Levels
+- [DESIGN_V2.md](./DESIGN_V2.md) - 設計仕様書
+- [CLAUDE.md](./CLAUDE.md) - Claude Code向けガイド
 
-- `low`: Low
-- `medium`: Medium (default)
-- `high`: High
+## 🔄 v1からの移行
 
-## Version History
+**v2は完全な再設計**です。v1（タスク管理）とv2（外部記憶装置）には互換性がありません。
 
-### v0.2.5 (Latest)
+### 主な変更点
 
-- ✨ **WebUI URL-based Routing**: React Router integration for proper URL navigation
-  - Workspace list: `/`
-  - Task list: `/workspaces/:workspaceId`
-  - Task detail: `/workspaces/:workspaceId/tasks/:taskId`
-- ✅ **Test Suite**: Added comprehensive WebUI routing tests (10 test cases)
-- 🎨 **UI Improvements**: Compact single-line stats display for Tasks/Todos/Actions
-- 🔧 **Configuration**: Added `.gitignore` for Claude Code settings
+| v1 | v2 |
+|---|---|
+| Workspace → Task → Todo → Action | Session → Event |
+| タスク管理 | AIの外部記憶装置 |
+| 4階層構造 | イベントストリーム型 |
+| task:*, todo:*, action:* コマンド | session:*, log:*, history, search コマンド |
 
-### v0.2.4
+v1を使用している場合は、データベースのバックアップを取ってからv2をご利用ください。
 
-- 🌐 WebUI implementation with Hono + React + TypeScript + Tailwind CSS + shadcn/ui
-- 📊 Task statistics and hierarchy visualization
-- 🎨 Modern UI with status badges and priority indicators
+## 📜 バージョン履歴
 
-### v0.2.3
+### v2.0.0 (Current)
 
-- 🧪 Added test suite with vitest (80+ tests)
-- 🛡️ Error handling improvements
-- 📝 JSON validation and utilities
+- 🎉 **完全な再設計**: タスク管理 → AIの外部記憶装置へ
+- 🎬 **イベントストリーム型**: Session → Event データモデル
+- 💭 **思考プロセス記録**: thinking イベントタイプ
+- 📝 **Intent → Edit フロー**: コード変更意図の明示的記録
+- 🔍 **FTS5全文検索**: 日本語・英語ハイブリッド検索
+- 🌐 **WebUI v2**: React 19 + Hono + タイムライン表示
+- ⚡ **高速化**: better-sqlite3による同期処理
 
-### Earlier Versions
+### v0.2.x (Legacy)
 
-- v0.2.0-0.2.2: Core CLI functionality, database layer, 4-layer hierarchy implementation
+- v1実装（タスク管理CLI）
 
-## Contributing
+## 🤝 貢献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+プルリクエストを歓迎します！
 
-## Repository
+## 🔗 リンク
 
-- GitHub: [https://github.com/nysg/ptta](https://github.com/nysg/ptta)
-- npm: [https://www.npmjs.com/package/@nysg/ptta](https://www.npmjs.com/package/@nysg/ptta)
+- **GitHub**: [https://github.com/nysg/ptta](https://github.com/nysg/ptta)
+- **npm**: [https://www.npmjs.com/package/@nysg/ptta](https://www.npmjs.com/package/@nysg/ptta)
 
-## License
+## 📄 ライセンス
 
 MIT
