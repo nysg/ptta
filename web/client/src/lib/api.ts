@@ -1,261 +1,276 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-export type Metadata = Record<string, unknown>;
+// ========================================
+// Types (matching v2 backend)
+// ========================================
 
-export interface Workspace {
-  id: number;
-  path: string;
-  name: string;
-  created_at: string;
+export type EventType =
+  | 'user_message'
+  | 'assistant_message'
+  | 'thinking'
+  | 'code_intention'
+  | 'file_edit'
+  | 'tool_use';
+
+export interface Session {
+  id: string;
+  workspace_path: string;
+  started_at: string;
+  ended_at: string | null;
+  metadata: Record<string, any>;
 }
 
-export interface Summary {
-  id: number;
-  entity_type: string;
-  entity_id: number;
-  summary: string;
-  metadata?: Metadata;
-  created_at: string;
+export interface SessionWithStats extends Session {
+  event_count: number;
+  last_event_at: string | null;
 }
 
-export interface Task {
-  id: number;
-  title: string;
-  description?: string;
-  status: string;
-  priority: string;
-  metadata?: Metadata;
-  created_at: string;
-  updated_at: string;
-  completed_at?: string;
+export interface Event {
+  id: string;
+  session_id: string;
+  sequence: number;
+  timestamp: string;
+  type: EventType;
+  data: EventData;
+  parent_event_id?: string;
 }
 
-export interface Todo {
-  id: number;
-  task_id: number;
-  title: string;
-  description?: string;
-  status: string;
-  priority: string;
-  metadata?: Metadata;
-  created_at: string;
-  updated_at: string;
-  completed_at?: string;
+export type EventData =
+  | UserMessageData
+  | AssistantMessageData
+  | ThinkingData
+  | CodeIntentionData
+  | FileEditData
+  | ToolUseData;
+
+export interface UserMessageData {
+  content: string;
 }
 
-export interface Action {
-  id: number;
-  todo_id: number;
-  title: string;
-  status: string;
-  metadata?: Metadata;
-  created_at: string;
-  completed_at?: string;
+export interface AssistantMessageData {
+  content: string;
+  tool_calls?: Array<{
+    tool: string;
+    args: any;
+  }>;
 }
 
-export interface TaskHierarchy extends Task {
-  todos?: (Todo & { actions?: Action[] })[];
-  summaries?: Summary[];
+export interface ThinkingData {
+  content: string;
+  context?: string;
+}
+
+export interface CodeIntentionData {
+  action: 'create' | 'edit' | 'delete';
+  file_path: string;
+  reason: string;
+  old_content?: string;
+  new_content?: string;
+  diff?: string;
+}
+
+export interface FileEditData {
+  action: 'create' | 'edit' | 'delete';
+  file_path: string;
+  old_content?: string;
+  new_content?: string;
+  diff: string;
+  intention_event_id?: string;
+  success: boolean;
+  error_message?: string;
+}
+
+export interface ToolUseData {
+  tool: string;
+  parameters: any;
+  result?: any;
+  duration_ms?: number;
+  success?: boolean;
+}
+
+export interface EventSearchResult {
+  id: string;
+  session_id: string;
+  sequence: number;
+  timestamp: string;
+  type: EventType;
+  data: EventData;
+  session: Session;
+  rank?: number;
+}
+
+export interface FileHistoryEntry {
+  event_id: string;
+  session_id: string;
+  timestamp: string;
+  action: 'create' | 'edit' | 'delete';
+  reason?: string;
+  diff: string;
+  intention_event_id?: string;
 }
 
 export interface Stats {
-  tasks: {
+  sessions: {
     total: number;
     active: number;
-    completed: number;
+    ended: number;
   };
-  todos: {
+  events: {
     total: number;
-    todo: number;
-    inProgress: number;
-    done: number;
+    by_type: Record<string, number>;
   };
-  actions: {
-    total: number;
-    todo: number;
-    done: number;
+  files: {
+    total_edits: number;
+    unique_files: number;
   };
 }
 
-// Update types for partial updates
-export interface TaskUpdate {
-  title?: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  metadata?: Metadata;
-}
-
-export interface TodoUpdate {
-  title?: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  metadata?: Metadata;
-}
-
-export interface ActionUpdate {
-  title?: string;
-  status?: string;
-  metadata?: Metadata;
-}
-
+// ========================================
 // API Client
+// ========================================
+
 export const api = {
-  // Workspaces
-  async getWorkspaces(): Promise<Workspace[]> {
-    const response = await fetch(`${API_BASE_URL}/workspaces`);
+  // Sessions
+  async getSessions(params?: {
+    workspace?: string;
+    limit?: number;
+    active?: boolean;
+  }): Promise<SessionWithStats[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.workspace) searchParams.append('workspace', params.workspace);
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.active !== undefined) searchParams.append('active', params.active.toString());
+
+    const response = await fetch(`${API_BASE_URL}/sessions?${searchParams}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch workspaces' }));
-      throw new Error(error.error || 'Failed to fetch workspaces');
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch sessions' }));
+      throw new Error(error.error || 'Failed to fetch sessions');
     }
     return response.json();
   },
 
-  // Tasks
-  async getTasks(path?: string, status?: string): Promise<Task[]> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-    if (status) params.append('status', status);
-
-    const response = await fetch(`${API_BASE_URL}/tasks?${params}`);
+  async getSession(id: string): Promise<Session> {
+    const response = await fetch(`${API_BASE_URL}/sessions/${id}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch tasks' }));
-      throw new Error(error.error || 'Failed to fetch tasks');
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch session' }));
+      throw new Error(error.error || 'Failed to fetch session');
     }
     return response.json();
   },
 
-  async getTask(id: number, path?: string): Promise<TaskHierarchy> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/tasks/${id}?${params}`);
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch task' }));
-      throw new Error(error.error || 'Failed to fetch task');
-    }
-    return response.json();
-  },
-
-  async createTask(data: { title: string; description?: string; priority?: string }, path?: string): Promise<Task> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/tasks?${params}`, {
+  async createSession(data: {
+    workspace_path: string;
+    metadata?: Record<string, any>;
+  }): Promise<Session> {
+    const response = await fetch(`${API_BASE_URL}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to create task' }));
-      throw new Error(error.error || 'Failed to create task');
+      const error = await response.json().catch(() => ({ error: 'Failed to create session' }));
+      throw new Error(error.error || 'Failed to create session');
     }
     return response.json();
   },
 
-  async updateTask(id: number, data: TaskUpdate, path?: string): Promise<Task> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/tasks/${id}?${params}`, {
+  async updateSession(id: string, data: {
+    ended_at?: string;
+    metadata?: Record<string, any>;
+  }): Promise<Session> {
+    const response = await fetch(`${API_BASE_URL}/sessions/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update task' }));
-      throw new Error(error.error || 'Failed to update task');
+      const error = await response.json().catch(() => ({ error: 'Failed to update session' }));
+      throw new Error(error.error || 'Failed to update session');
     }
     return response.json();
   },
 
-  // Todos
-  async getTodos(path?: string, taskId?: number, status?: string): Promise<Todo[]> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-    if (taskId) params.append('taskId', taskId.toString());
-    if (status) params.append('status', status);
+  // Events
+  async getSessionEvents(sessionId: string, params?: {
+    type?: EventType;
+    limit?: number;
+  }): Promise<Event[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.append('type', params.type);
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
 
-    const response = await fetch(`${API_BASE_URL}/todos?${params}`);
+    const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/events?${searchParams}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch todos' }));
-      throw new Error(error.error || 'Failed to fetch todos');
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch events' }));
+      throw new Error(error.error || 'Failed to fetch events');
     }
     return response.json();
   },
 
-  async createTodo(data: { task_id: number; title: string; description?: string; priority?: string }, path?: string): Promise<Todo> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
+  async getEvent(id: string): Promise<Event> {
+    const response = await fetch(`${API_BASE_URL}/events/${id}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch event' }));
+      throw new Error(error.error || 'Failed to fetch event');
+    }
+    return response.json();
+  },
 
-    const response = await fetch(`${API_BASE_URL}/todos?${params}`, {
+  async createEvent(data: {
+    session_id: string;
+    type: EventType;
+    data: EventData;
+    parent_event_id?: string;
+  }): Promise<Event> {
+    const response = await fetch(`${API_BASE_URL}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to create todo' }));
-      throw new Error(error.error || 'Failed to create todo');
+      const error = await response.json().catch(() => ({ error: 'Failed to create event' }));
+      throw new Error(error.error || 'Failed to create event');
     }
     return response.json();
   },
 
-  async updateTodo(id: number, data: TodoUpdate, path?: string): Promise<Todo> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
+  // Search
+  async search(query: string, params?: {
+    session?: string;
+    type?: EventType;
+  }): Promise<EventSearchResult[]> {
+    const searchParams = new URLSearchParams();
+    searchParams.append('q', query);
+    if (params?.session) searchParams.append('session', params.session);
+    if (params?.type) searchParams.append('type', params.type);
 
-    const response = await fetch(`${API_BASE_URL}/todos/${id}?${params}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    const response = await fetch(`${API_BASE_URL}/search?${searchParams}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update todo' }));
-      throw new Error(error.error || 'Failed to update todo');
+      const error = await response.json().catch(() => ({ error: 'Failed to search' }));
+      throw new Error(error.error || 'Failed to search');
     }
     return response.json();
   },
 
-  // Actions
-  async createAction(data: { todo_id: number; title: string }, path?: string): Promise<Action> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
+  // File History
+  async getFileHistory(filePath: string): Promise<FileHistoryEntry[]> {
+    const searchParams = new URLSearchParams();
+    searchParams.append('path', filePath);
 
-    const response = await fetch(`${API_BASE_URL}/actions?${params}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    const response = await fetch(`${API_BASE_URL}/files/history?${searchParams}`);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to create action' }));
-      throw new Error(error.error || 'Failed to create action');
-    }
-    return response.json();
-  },
-
-  async updateAction(id: number, data: ActionUpdate, path?: string): Promise<Action> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
-
-    const response = await fetch(`${API_BASE_URL}/actions/${id}?${params}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to update action' }));
-      throw new Error(error.error || 'Failed to update action');
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch file history' }));
+      throw new Error(error.error || 'Failed to fetch file history');
     }
     return response.json();
   },
 
   // Stats
-  async getStats(path?: string): Promise<Stats> {
-    const params = new URLSearchParams();
-    if (path) params.append('path', path);
+  async getStats(params?: { workspace?: string }): Promise<Stats> {
+    const searchParams = new URLSearchParams();
+    if (params?.workspace) searchParams.append('workspace', params.workspace);
 
-    const response = await fetch(`${API_BASE_URL}/stats?${params}`);
+    const response = await fetch(`${API_BASE_URL}/stats?${searchParams}`);
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to fetch stats' }));
       throw new Error(error.error || 'Failed to fetch stats');

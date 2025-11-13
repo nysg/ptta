@@ -1,359 +1,437 @@
-import { Routes, Route, useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { api, type Task, type TaskHierarchy, type Workspace } from './lib/api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
-import { Button } from './components/ui/button'
+import { Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { api, type SessionWithStats, type Event, type EventSearchResult, type EventType } from './lib/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Button } from './components/ui/button';
+import { useState } from 'react';
 
-function WorkspacesPage() {
-  const navigate = useNavigate()
+// ========================================
+// Sessions List Page
+// ========================================
 
-  const { data: workspaces, isLoading: isLoadingWorkspaces } = useQuery<Workspace[]>({
-    queryKey: ['workspaces'],
-    queryFn: () => api.getWorkspaces(),
-  })
+function SessionsPage() {
+  const navigate = useNavigate();
+  const [activeOnly, setActiveOnly] = useState(false);
 
-  if (isLoadingWorkspaces) {
+  const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
+    queryKey: ['sessions', { active: activeOnly }],
+    queryFn: () => api.getSessions({ active: activeOnly, limit: 50 }),
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['stats'],
+    queryFn: () => api.getStats(),
+  });
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-8">
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
-            <p className="text-muted-foreground">AI-first Task Management</p>
+            <h1 className="text-4xl font-bold tracking-tight">ptta v2</h1>
+            <p className="text-muted-foreground">AI External Memory - Event Stream</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/search">
+              <Button variant="outline">Search</Button>
+            </Link>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold tracking-tight">Workspaces</h2>
+        {/* Stats */}
+        {stats && (
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Sessions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.sessions.total}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.sessions.active} active, {stats.sessions.ended} ended
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Events</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.events.total}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">File Edits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.files.total_edits}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.files.unique_files} unique files
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-          {workspaces && workspaces.length > 0 ? (
+        {/* Filter */}
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={!activeOnly ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveOnly(false)}
+          >
+            All
+          </Button>
+          <Button
+            variant={activeOnly ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveOnly(true)}
+          >
+            Active Only
+          </Button>
+        </div>
+
+        {/* Sessions List */}
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold tracking-tight">Sessions</h2>
+
+          {sessions && sessions.length > 0 ? (
             <div className="grid gap-4">
-              {workspaces.map((workspace) => (
+              {sessions.map((session) => (
                 <Card
-                  key={workspace.id}
+                  key={session.id}
                   className="cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/workspaces/${workspace.id}`)}
+                  onClick={() => navigate(`/sessions/${session.id}`)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>#{workspace.id} {workspace.name}</CardTitle>
-                        <CardDescription className="mt-2">
-                          {workspace.path}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">
+                            {session.workspace_path.split('/').pop() || 'Workspace'}
+                          </CardTitle>
+                          {!session.ended_at && (
+                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <CardDescription className="mt-2 font-mono text-xs">
+                          {session.workspace_path}
                         </CardDescription>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Created: {new Date(workspace.created_at).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground">No workspaces yet</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function TasksPage() {
-  const { workspaceId } = useParams<{ workspaceId: string }>()
-  const navigate = useNavigate()
-
-  const { data: workspaces } = useQuery<Workspace[]>({
-    queryKey: ['workspaces'],
-    queryFn: () => api.getWorkspaces(),
-  })
-
-  const workspace = workspaces?.find(w => w.id === Number(workspaceId))
-
-  const { data: tasks, isLoading: isLoadingTasks } = useQuery<Task[]>({
-    queryKey: ['tasks', workspace?.path],
-    queryFn: () => api.getTasks(workspace?.path || undefined),
-    enabled: !!workspace,
-  })
-
-  const { data: stats } = useQuery({
-    queryKey: ['stats', workspace?.path],
-    queryFn: () => api.getStats(workspace?.path || undefined),
-    enabled: !!workspace,
-  })
-
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
-            <p className="text-muted-foreground">AI-first Task Management</p>
-          </div>
-          <Button variant="outline" onClick={() => navigate('/')}>
-            Back to Workspaces
-          </Button>
-        </div>
-
-        {stats && (
-          <div className="grid gap-2 md:grid-cols-3 mb-4">
-            <Card>
-              <CardContent className="py-2 px-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-medium">Tasks</span>
-                  <span className="font-bold">{stats.tasks.total}</span>
-                  <span className="text-muted-foreground text-xs">{stats.tasks.active} active, {stats.tasks.completed} done</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="py-2 px-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-medium">Todos</span>
-                  <span className="font-bold">{stats.todos.total}</span>
-                  <span className="text-muted-foreground text-xs">{stats.todos.inProgress} in progress, {stats.todos.done} done</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="py-2 px-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-medium">Actions</span>
-                  <span className="font-bold">{stats.actions.total}</span>
-                  <span className="text-muted-foreground text-xs">{stats.actions.todo} todo, {stats.actions.done} done</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
-
-          {isLoadingTasks ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground">Loading tasks...</p>
-              </CardContent>
-            </Card>
-          ) : tasks && tasks.length > 0 ? (
-            <div className="grid gap-4">
-              {tasks.map((task) => (
-                <Card
-                  key={task.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/workspaces/${workspaceId}/tasks/${task.id}`)}
-                >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>#{task.id} {task.title}</CardTitle>
-                        {task.description && (
-                          <CardDescription className="mt-2">
-                            {task.description}
-                          </CardDescription>
+                      <div className="text-right text-sm text-muted-foreground">
+                        <div>{new Date(session.started_at).toLocaleString()}</div>
+                        {session.event_count > 0 && (
+                          <div className="mt-1">{session.event_count} events</div>
                         )}
                       </div>
-                      <div className="flex gap-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          task.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                          task.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {task.status}
-                        </span>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {task.priority}
-                        </span>
-                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Created: {new Date(task.created_at).toLocaleDateString()}
-                    </p>
-                  </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground">No tasks yet</p>
+              <CardContent className="py-8">
+                <p className="text-center text-muted-foreground">
+                  No sessions found. Start using ptta CLI to create sessions.
+                </p>
               </CardContent>
             </Card>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function TaskDetailPage() {
-  const { workspaceId, taskId } = useParams<{ workspaceId: string; taskId: string }>()
-  const navigate = useNavigate()
+// ========================================
+// Session Detail Page (Timeline)
+// ========================================
 
-  const { data: workspaces } = useQuery<Workspace[]>({
-    queryKey: ['workspaces'],
-    queryFn: () => api.getWorkspaces(),
-  })
+function SessionDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
-  const workspace = workspaces?.find(w => w.id === Number(workspaceId))
+  const { data: session } = useQuery({
+    queryKey: ['session', id],
+    queryFn: () => api.getSession(id!),
+    enabled: !!id,
+  });
 
-  const { data: taskDetail } = useQuery<TaskHierarchy>({
-    queryKey: ['task', taskId, workspace?.path],
-    queryFn: () => api.getTask(Number(taskId), workspace?.path || undefined),
-    enabled: !!workspace && !!taskId,
-  })
+  const { data: events, isLoading } = useQuery<Event[]>({
+    queryKey: ['events', id],
+    queryFn: () => api.getSessionEvents(id!, { limit: 200 }),
+    enabled: !!id,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">ptta</h1>
-            <p className="text-muted-foreground">AI-first Task Management</p>
-          </div>
-          <Button variant="outline" onClick={() => navigate(`/workspaces/${workspaceId}`)}>
-            Back to Tasks
+        {/* Header */}
+        <div className="mb-8">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-4">
+            ← Back to Sessions
           </Button>
+          {session && (
+            <>
+              <h1 className="text-3xl font-bold tracking-tight mb-2">Session Timeline</h1>
+              <p className="text-muted-foreground font-mono text-sm">{session.workspace_path}</p>
+              <div className="text-sm text-muted-foreground mt-2">
+                Started: {new Date(session.started_at).toLocaleString()}
+                {session.ended_at && ` • Ended: ${new Date(session.ended_at).toLocaleString()}`}
+              </div>
+            </>
+          )}
         </div>
 
-        {taskDetail && (
-          <div className="space-y-6">
+        {/* Timeline */}
+        <div className="space-y-4">
+          {events && events.length > 0 ? (
+            events.map((event) => <EventCard key={event.id} event={event} />)
+          ) : (
             <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-3xl">#{taskDetail.id} {taskDetail.title}</CardTitle>
-                    {taskDetail.description && (
-                      <CardDescription className="mt-2 text-base">
-                        {taskDetail.description}
-                      </CardDescription>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      taskDetail.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                      taskDetail.status === 'completed' ? 'bg-green-100 text-green-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {taskDetail.status}
-                    </span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      taskDetail.priority === 'high' ? 'bg-red-100 text-red-700' :
-                      taskDetail.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {taskDetail.priority}
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
+              <CardContent className="py-8">
+                <p className="text-center text-muted-foreground">No events in this session.</p>
+              </CardContent>
             </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight">Todos</h2>
+// ========================================
+// Search Page
+// ========================================
 
-              {taskDetail.todos && taskDetail.todos.length > 0 ? (
-                <div className="space-y-4">
-                  {taskDetail.todos.map((todo) => (
-                    <Card key={todo.id}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-xl">#{todo.id} {todo.title}</CardTitle>
-                            {todo.description && (
-                              <CardDescription className="mt-2">
-                                {todo.description}
-                              </CardDescription>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              todo.status === 'todo' ? 'bg-gray-100 text-gray-700' :
-                              todo.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                              'bg-green-100 text-green-700'
-                            }`}>
-                              {todo.status}
-                            </span>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              todo.priority === 'high' ? 'bg-red-100 text-red-700' :
-                              todo.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {todo.priority}
-                            </span>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      {todo.actions && todo.actions.length > 0 && (
-                        <CardContent>
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Actions:</p>
-                            <ul className="space-y-1">
-                              {todo.actions.map((action) => (
-                                <li key={action.id} className="flex items-center gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
-                                    checked={action.status === 'done'}
-                                    readOnly
-                                    className="rounded"
-                                  />
-                                  <span className={action.status === 'done' ? 'line-through text-muted-foreground' : ''}>
-                                    #{action.id} {action.title}
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <p className="text-muted-foreground">No todos yet</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+function SearchPage() {
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { data: results, isLoading } = useQuery<EventSearchResult[]>({
+    queryKey: ['search', searchQuery],
+    queryFn: () => api.search(searchQuery),
+    enabled: searchQuery.length > 0,
+  });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchQuery(query);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-8">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-4">
+          ← Back to Sessions
+        </Button>
+
+        <h1 className="text-3xl font-bold tracking-tight mb-6">Search Events</h1>
+
+        <form onSubmit={handleSearch} className="mb-8">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search for content..."
+              className="flex-1 px-4 py-2 border rounded-md"
+            />
+            <Button type="submit" disabled={query.length === 0}>
+              Search
+            </Button>
           </div>
+        </form>
+
+        {isLoading && (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Searching...</p>
+          </div>
+        )}
+
+        {results && results.length > 0 && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Found {results.length} results</p>
+            {results.map((result) => (
+              <Card
+                key={result.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/sessions/${result.session_id}`)}
+              >
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        {result.type}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(result.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    {renderEventData(result.data, result.type)}
+                  </div>
+                  <CardDescription className="mt-2 text-xs">
+                    Session: {result.session.workspace_path}
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {results && results.length === 0 && searchQuery && (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">
+                No results found for "{searchQuery}"
+              </p>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
-  )
+  );
 }
 
-function App() {
+// ========================================
+// Event Card Component
+// ========================================
+
+function EventCard({ event }: { event: Event }) {
+  const typeColors: Record<EventType, string> = {
+    user_message: 'bg-blue-100 text-blue-800',
+    assistant_message: 'bg-green-100 text-green-800',
+    thinking: 'bg-yellow-100 text-yellow-800',
+    code_intention: 'bg-purple-100 text-purple-800',
+    file_edit: 'bg-orange-100 text-orange-800',
+    tool_use: 'bg-gray-100 text-gray-800',
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 text-xs rounded ${typeColors[event.type]}`}>
+              {event.type}
+            </span>
+            <span className="text-sm text-muted-foreground">#{event.sequence}</span>
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {new Date(event.timestamp).toLocaleString()}
+          </span>
+        </div>
+        <div>{renderEventData(event.data, event.type)}</div>
+      </CardHeader>
+    </Card>
+  );
+}
+
+// ========================================
+// Render Event Data
+// ========================================
+
+function renderEventData(data: any, type: EventType) {
+  switch (type) {
+    case 'user_message':
+    case 'assistant_message':
+      return (
+        <div className="prose prose-sm max-w-none">
+          <p className="whitespace-pre-wrap">{data.content}</p>
+        </div>
+      );
+
+    case 'thinking':
+      return (
+        <div className="text-sm">
+          {data.context && (
+            <span className="text-muted-foreground mr-2">[{data.context}]</span>
+          )}
+          <span className="italic">{data.content}</span>
+        </div>
+      );
+
+    case 'code_intention':
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{data.action}</span>
+            <span className="font-mono text-sm">{data.file_path}</span>
+          </div>
+          <p className="text-sm text-muted-foreground">Reason: {data.reason}</p>
+        </div>
+      );
+
+    case 'file_edit':
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{data.action}</span>
+            <span className="font-mono text-sm">{data.file_path}</span>
+            {data.success ? (
+              <span className="text-green-600">✓</span>
+            ) : (
+              <span className="text-red-600">✗</span>
+            )}
+          </div>
+          {data.diff && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground">View diff</summary>
+              <pre className="mt-2 p-2 bg-gray-50 rounded overflow-x-auto">{data.diff}</pre>
+            </details>
+          )}
+        </div>
+      );
+
+    case 'tool_use':
+      return (
+        <div className="space-y-1">
+          <div className="font-mono text-sm">{data.tool}</div>
+          {data.duration_ms && (
+            <div className="text-xs text-muted-foreground">{data.duration_ms}ms</div>
+          )}
+        </div>
+      );
+
+    default:
+      return <pre className="text-xs">{JSON.stringify(data, null, 2)}</pre>;
+  }
+}
+
+// ========================================
+// Main App
+// ========================================
+
+export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<WorkspacesPage />} />
-      <Route path="/workspaces/:workspaceId" element={<TasksPage />} />
-      <Route path="/workspaces/:workspaceId/tasks/:taskId" element={<TaskDetailPage />} />
+      <Route path="/" element={<SessionsPage />} />
+      <Route path="/sessions/:id" element={<SessionDetailPage />} />
+      <Route path="/search" element={<SearchPage />} />
     </Routes>
-  )
+  );
 }
-
-export default App
