@@ -192,6 +192,124 @@ ptta session:end
 ptta export --output session_summary.json
 ```
 
+## 📌 Claude Codeでの効果的な使い方
+
+### CLAUDE.mdへの追加推奨
+
+プロジェクトの `CLAUDE.md` に以下のセクションを追加することで、Claude Codeが自動的にpttaを使用するようになります：
+
+```markdown
+## ptta使用ルール（必須）
+
+このリポジトリで作業する際は、**必ず以下のルールに従ってpttaを使用してください**：
+
+### セッション開始時（必須）
+1. `ptta session:start` でセッションを開始
+2. `ptta history --limit 20` で前回の作業内容を確認
+3. 前回の続きの場合は `ptta file:history <path>` で関連ファイルの履歴を確認
+
+### ユーザーからの指示を受けた時（必須）
+- `ptta log:user "<message>"` でユーザーの発言を記録
+
+### 作業中（推奨）
+- 重要な判断時: `ptta log:thinking "<thought>" --context "<context>"`
+- 自分の返答: `ptta log:assistant "<message>"`
+
+### ファイル編集時（必須）
+**Intent → Edit フローを厳守**：
+1. 編集前: `ptta log:intention <file_path> --reason "<理由>"`
+2. 実際にファイルを編集（Editツール使用）
+3. 編集後: `ptta log:edit <file_path> --action edit`
+
+### セッション終了時（必須）
+- `ptta session:end` でセッションを終了
+```
+
+### 作業指示時のプロンプト例
+
+#### 初回作業時
+
+```markdown
+このリポジトリではpttaというAI外部記憶装置を使用しています。
+必ず以下の手順で作業を開始してください：
+
+1. `ptta session:start` でセッションを開始
+2. `ptta history --limit 20` で前回の作業内容を確認
+3. ファイル編集時は必ず Intent → Edit フロー：
+   - 編集前: `ptta log:intention <file> --reason "<理由>"`
+   - 編集実行
+   - 編集後: `ptta log:edit <file> --action edit`
+4. 作業完了時: `ptta session:end`
+
+それでは、[具体的な作業内容]をお願いします。
+```
+
+#### 継続作業時
+
+```markdown
+前回の続きから作業を再開します。
+まず `ptta session:start` と `ptta history --limit 30` で前回の内容を確認してから、
+[具体的な作業内容]を進めてください。
+
+Intent → Edit フローを忘れずに。
+```
+
+#### 簡潔版（リマインダー）
+
+```markdown
+[作業内容の指示]
+
+※ pttaで記録（session:start → intention → edit → session:end）
+```
+
+### 実践的なフロー例
+
+完全な作業フローの例：
+
+```bash
+# 1. セッション開始
+ptta session:start
+
+# 2. 前回の確認
+ptta history --limit 20
+
+# 3. ユーザー指示の記録
+ptta log:user "認証機能を追加してください"
+
+# 4. 作業方針の記録
+ptta log:assistant "JWT認証を実装します。src/auth.tsにミドルウェアを追加します"
+
+# 5. 思考プロセスの記録
+ptta log:thinking "セキュリティを考慮し、JWTの有効期限は24時間に設定" --context "authentication"
+
+# 6. ファイル編集（3ステップ）
+ptta log:intention src/auth.ts --reason "JWT検証ミドルウェアを追加"
+# ... 実際の編集 ...
+ptta log:edit src/auth.ts --action edit
+
+# 7. セッション終了
+ptta session:end
+```
+
+### ベストプラクティス
+
+1. **セッション開始を忘れない**: 毎回 `ptta session:start` から始める
+2. **Intent → Edit フローを必ず守る**: これにより変更理由が明確になる
+3. **思考プロセスを記録**: 重要な判断は `log:thinking` で保存
+4. **定期的に履歴確認**: `ptta history` で作業の流れを把握
+5. **セッション終了を明示**: `ptta session:end` で区切りをつける
+
+### トラブルシューティング
+
+**Q: セッションを開始し忘れた場合は？**
+A: いつでも `ptta session:start` を実行できます。既存のアクティブセッションがある場合は警告が表示されます。
+
+**Q: Intent を記録せずに編集してしまった場合は？**
+A: 編集後でも `ptta log:intention` を実行できますが、できるだけ編集前に記録することを推奨します。
+
+**Q: 前回のセッションを確認するには？**
+A: `ptta session:list --limit 10` で最近のセッションを確認し、`ptta session:show <id>` で詳細を表示できます。
+
 ## 💾 データ保存場所
 
 ```
